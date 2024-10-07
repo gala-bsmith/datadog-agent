@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"net/url"
 	"os"
 	"path"
@@ -171,8 +170,8 @@ func readProfileData(seconds int) (flare.ProfileData, error) {
 
 	type pprofGetter func(path string) ([]byte, error)
 
-	tcpGet := func(portConfig string) pprofGetter {
-		pprofURL := fmt.Sprintf("http://127.0.0.1:%d/debug/pprof", pkgconfigsetup.Datadog().GetInt(portConfig))
+	tcpGet := func(endpoint string) pprofGetter {
+		pprofURL := fmt.Sprintf("http://%v/debug/pprof", endpoint)
 		return func(path string) ([]byte, error) {
 			return util.DoGet(c, pprofURL+path, util.LeaveConnectionOpen)
 		}
@@ -224,15 +223,15 @@ func readProfileData(seconds int) (flare.ProfileData, error) {
 	}
 
 	agentCollectors := map[string]agentProfileCollector{
-		"core":           serviceProfileCollector(tcpGet("expvar_port"), seconds),
-		"security-agent": serviceProfileCollector(tcpGet("security_agent.expvar_port"), seconds),
+		"core":           serviceProfileCollector(tcpGet(util.CoreExpvar), seconds),
+		"security-agent": serviceProfileCollector(tcpGet(util.SecurityExpvar), seconds),
 	}
 
 	if pkgconfigsetup.Datadog().GetBool("process_config.enabled") ||
 		pkgconfigsetup.Datadog().GetBool("process_config.container_collection.enabled") ||
 		pkgconfigsetup.Datadog().GetBool("process_config.process_collection.enabled") {
 
-		agentCollectors["process"] = serviceProfileCollector(tcpGet("process_config.expvar_port"), seconds)
+		agentCollectors["process"] = serviceProfileCollector(tcpGet(util.ProcessExpvar), seconds)
 	}
 
 	if pkgconfigsetup.Datadog().GetBool("apm_config.enabled") {
@@ -245,7 +244,7 @@ func readProfileData(seconds int) (flare.ProfileData, error) {
 			traceCpusec = 4
 		}
 
-		agentCollectors["trace"] = serviceProfileCollector(tcpGet("apm_config.debug.port"), traceCpusec)
+		agentCollectors["trace"] = serviceProfileCollector(tcpGet(util.TraceExpvar), traceCpusec)
 	}
 
 	if pkgconfigsetup.SystemProbe().GetBool("system_probe_config.enabled") {
@@ -390,16 +389,15 @@ func makeFlare(flareComp flare.Component,
 func requestArchive(flareComp flare.Component, pdata flare.ProfileData, providerTimeout time.Duration) (string, error) {
 	fmt.Fprintln(color.Output, color.BlueString("Asking the agent to build the flare archive."))
 	c := util.GetClient(false) // FIX: get certificates right then make this true
-	ipcAddress, err := pkgconfigsetup.GetIPCAddress(pkgconfigsetup.Datadog())
-	if err != nil {
-		fmt.Fprintln(color.Output, color.RedString(fmt.Sprintf("Error getting IPC address for the agent: %s", err)))
-		return createArchive(flareComp, pdata, providerTimeout, err)
-	}
+	// ipcAddress, err := pkgconfigsetup.GetIPCAddress(pkgconfigsetup.Datadog())
+	// if err != nil {
+	// 	fmt.Fprintln(color.Output, color.RedString(fmt.Sprintf("Error getting IPC address for the agent: %s", err)))
+	// 	return createArchive(flareComp, pdata, err)
+	// }
 
-	cmdport := pkgconfigsetup.Datadog().GetInt("cmd_port")
 	url := &url.URL{
 		Scheme: "https",
-		Host:   net.JoinHostPort(ipcAddress, strconv.Itoa(cmdport)),
+		Host:   util.CoreCmd,
 		Path:   "/agent/flare",
 	}
 	if providerTimeout > 0 {
@@ -411,7 +409,7 @@ func requestArchive(flareComp flare.Component, pdata flare.ProfileData, provider
 	urlstr := url.String()
 
 	// Set session token
-	if err = util.SetAuthToken(pkgconfigsetup.Datadog()); err != nil {
+	if err := util.SetAuthToken(pkgconfigsetup.Datadog()); err != nil {
 		fmt.Fprintln(color.Output, color.RedString(fmt.Sprintf("Error: %s", err)))
 		return createArchive(flareComp, pdata, providerTimeout, err)
 	}
