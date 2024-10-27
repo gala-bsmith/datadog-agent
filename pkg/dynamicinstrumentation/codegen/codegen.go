@@ -116,10 +116,16 @@ func generateParametersTextViaLocationExpressions(params []ditypes.Parameter, ou
 
 func resolveLocationExpressionTemplate(locationExpression ditypes.LocationExpression) (*template.Template, error) {
 	if locationExpression.Opcode == ditypes.OpReadUserRegister {
-		return template.New("read_location_expression").Parse(readRegisterTemplateText)
+		return template.New("read_register_location_expression").Parse(readRegisterTemplateText)
 	}
-	if locationExpression.Opcode == ditypes.OpPop {
-		return template.New("pop_location_expression").Parse(popTemplateText)
+	if locationExpression.Opcode == ditypes.OpReadUserStack {
+		return template.New("read)stack_location_expression").Parse(readStackTemplateText)
+	}
+	if locationExpression.Opcode == ditypes.OpReadUserRegisterToOutput {
+		return template.New("read_register_to_output_location_expression").Parse(readRegisterValueToOutputTemplateText)
+	}
+	if locationExpression.Opcode == ditypes.OpReadUserStackToOutput {
+		return template.New("read_stack_to_output_location_expression").Parse(readStackValueToOutputTemplateText)
 	}
 	if locationExpression.Opcode == ditypes.OpDereference {
 		return template.New("dereference_location_expression").Parse(dereferenceTemplateText)
@@ -130,10 +136,15 @@ func resolveLocationExpressionTemplate(locationExpression ditypes.LocationExpres
 	if locationExpression.Opcode == ditypes.OpDereferenceLarge {
 		return template.New("dereference_large_location_expression").Parse(dereferenceLargeTemplateText)
 	}
+	if locationExpression.Opcode == ditypes.OpDereferenceLargeToOutput {
+		return template.New("dereference_large_to_output_location_expression").Parse(dereferenceLargeToOutputTemplateText)
+	}
 	if locationExpression.Opcode == ditypes.OpApplyOffset {
 		return template.New("apply_offset_location_expression").Parse(applyOffsetTemplateText)
 	}
-
+	if locationExpression.Opcode == ditypes.OpPop {
+		return template.New("pop_location_expression").Parse(popTemplateText)
+	}
 	return nil, errors.New("invalid location expression opcode")
 }
 

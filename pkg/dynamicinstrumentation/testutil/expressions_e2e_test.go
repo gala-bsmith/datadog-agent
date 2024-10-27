@@ -27,7 +27,7 @@ func TestExpressionsInstrumentation(t *testing.T) {
 			FuncName: "test_single_uint",
 			Expressions: []ditypes.LocationExpression{
 				ditypes.ReadRegisterLocationExpression(0, 8),
-				ditypes.PopLocationExpression(8),
+				ditypes.PopLocationExpression(1, 8),
 			},
 			ExpectedArgData: []*ditypes.Param{
 				{
@@ -41,12 +41,9 @@ func TestExpressionsInstrumentation(t *testing.T) {
 		},
 
 		{
-			Name:     "test2",
-			FuncName: "test_uint_slice",
-			Expressions: []ditypes.LocationExpression{
-				ditypes.ReadRegisterLocationExpression(0, 8),
-				ditypes.PopLocationExpression(8),
-			},
+			Name:        "test2",
+			FuncName:    "test_uint_slice",
+			Expressions: []ditypes.LocationExpression{},
 			ExpectedArgData: []*ditypes.Param{
 				{
 					ValueStr: "",
@@ -79,14 +76,10 @@ func TestExpressionsInstrumentation(t *testing.T) {
 				},
 			},
 		},
-
 		{
-			Name:     "test3",
-			FuncName: "test_single_string",
-			Expressions: []ditypes.LocationExpression{
-				ditypes.ReadRegisterLocationExpression(0, 8),
-				ditypes.PopLocationExpression(8),
-			},
+			Name:        "test3",
+			FuncName:    "test_single_string",
+			Expressions: []ditypes.LocationExpression{},
 			ExpectedArgData: []*ditypes.Param{
 				{
 					ValueStr: "abc",
@@ -97,14 +90,10 @@ func TestExpressionsInstrumentation(t *testing.T) {
 				},
 			},
 		},
-
 		{
-			Name:     "test4",
-			FuncName: "test_pointer_to_simple_struct",
-			Expressions: []ditypes.LocationExpression{
-				ditypes.ReadRegisterLocationExpression(0, 8),
-				ditypes.PopLocationExpression(8),
-			},
+			Name:        "test4",
+			FuncName:    "test_pointer_to_simple_struct",
+			Expressions: []ditypes.LocationExpression{},
 			ExpectedArgData: []*ditypes.Param{
 				&ditypes.Param{
 					ValueStr: "0x400059FD50",
@@ -141,7 +130,8 @@ func TestExpressionsInstrumentation(t *testing.T) {
 	}
 	for _, testcase := range testCases {
 		t.Run(testcase.Name, func(t *testing.T) {
-
+			// Compile/run sample service
+			// Go from list of expressions to fully formed bpf code, to compilation and attachment
 		})
 	}
 }
