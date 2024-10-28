@@ -93,8 +93,11 @@ const (
 	OpDereferenceToOutput
 	OpDereferenceLarge
 	OpDereferenceLargeToOutput
+	OpDereferenceDynamic
+	OpDereferenceDynamicToOutput
 	OpApplyOffset
 	OpPop
+	OpPopDynamic
 )
 
 // Arg1 = register
@@ -143,6 +146,22 @@ func DereferenceLargeToOutputLocationExpression(typeSize uint) LocationExpressio
 	return LocationExpression{Opcode: OpDereferenceLargeToOutput, Arg1: typeSize, Arg2: (typeSize + 7) / 8, InstructionID: randomID()}
 }
 
+// Maximum limit (Arg1) should be set to the size of each element * max collection length
+// Arg1 = maximum limit on bytes read
+// Arg2 = number of chunks (should be (max + 7)/8)
+// Arg3 = size of each element
+func DereferenceDynamicLocationExpression(readLimit, elementSize uint) LocationExpression {
+	return LocationExpression{Opcode: OpDereferenceDynamic, Arg1: readLimit, Arg2: (readLimit + 7) / 8, Arg3: elementSize, InstructionID: randomID()}
+}
+
+// Maximum limit (Arg1) should be set to the size of each element * max collection length
+// Arg1 = maximum limit on bytes read
+// Arg2 = number of chunks (should be (max + 7)/8)
+// Arg3 = size of each element
+func DereferenceDynamicToOutputLocationExpression(readLimit, elementSize uint) LocationExpression {
+	return LocationExpression{Opcode: OpDereferenceDynamicToOutput, Arg1: readLimit, Arg2: (readLimit + 7) / 8, Arg3: elementSize, InstructionID: randomID()}
+}
+
 // Arg1 = uint value (offset) we're adding to the 8-byte address on top of the stack
 func ApplyOffsetLocationExpression(offset uint) LocationExpression {
 	return LocationExpression{Opcode: OpApplyOffset, Arg1: offset, InstructionID: randomID()}
@@ -154,10 +173,16 @@ func PopLocationExpression(numElements, elementSize uint) LocationExpression {
 	return LocationExpression{Opcode: OpPop, Arg1: numElements, Arg2: elementSize, InstructionID: randomID()}
 }
 
+// Arg1 = size of each element
+func PopDynamicLocationExpression(elementSize uint) LocationExpression {
+	return LocationExpression{Opcode: OpPopDynamic, Arg1: elementSize, InstructionID: randomID()}
+}
+
 type LocationExpression struct {
 	Opcode        LocationExpressionOpcode
 	Arg1          uint
 	Arg2          uint
+	Arg3          uint
 	InstructionID string
 }
 

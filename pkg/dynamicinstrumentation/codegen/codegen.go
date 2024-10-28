@@ -139,11 +139,20 @@ func resolveLocationExpressionTemplate(locationExpression ditypes.LocationExpres
 	if locationExpression.Opcode == ditypes.OpDereferenceLargeToOutput {
 		return template.New("dereference_large_to_output_location_expression").Parse(dereferenceLargeToOutputTemplateText)
 	}
+	if locationExpression.Opcode == ditypes.OpDereferenceDynamic {
+		return template.New("dereference_dynamic_location_expression").Parse(dereferenceDynamicTemplateText)
+	}
+	if locationExpression.Opcode == ditypes.OpDereferenceDynamicToOutput {
+		return template.New("dereference_dynamic_to_output_location_expression").Parse(dereferenceDynamicToOutputTemplateText)
+	}
 	if locationExpression.Opcode == ditypes.OpApplyOffset {
 		return template.New("apply_offset_location_expression").Parse(applyOffsetTemplateText)
 	}
 	if locationExpression.Opcode == ditypes.OpPop {
 		return template.New("pop_location_expression").Parse(popTemplateText)
+	}
+	if locationExpression.Opcode == ditypes.OpPopDynamic {
+		return template.New("pop_dynamic_location_expression").Parse(popDynamicTemplateText)
 	}
 	return nil, errors.New("invalid location expression opcode")
 }

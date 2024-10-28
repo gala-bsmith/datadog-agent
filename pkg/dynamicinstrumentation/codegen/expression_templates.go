@@ -173,12 +173,49 @@ addressHolder_{{.InstructionID}} += {{.Arg1}};
 bpf_map_push_elem(&param_stack, &addressHolder_{{.InstructionID}}, 0);
 `
 
-var variablePopTemplateText = `
+var popDynamicTemplateText = `
 `
 
-var variableDereferenceTemplateText = `
+var dereferenceDynamicTemplateText = `
+// Arg1 = maximum limit on bytes read
+// Arg2 = number of chunks (should be (max + 7)/8)
+// Arg3 = size of each element
 
+__u64 lengthToRead_{{.InstructionID}} = 0;
+bpf_map_pop_elem(&param_stack, &lengthToRead_{{.InstructionID}});
+
+__u64 addressHolder_{{.InstructionID}} = 0;
+bpf_map_pop_elem(&param_stack, &addressHolder_{{.InstructionID}});
+
+for (i = 0; i < {{.Arg2}}; i++) {
+    chunk_size = (i == {{.Arg2}} - 1 && {{.Arg1}} % 8 != 0) ? ({{.Arg1}} % 8) : 8;
+    bpf_probe_read(&temp_storage[i], chunk_size, (void*)(addressHolder_{{.InstructionID}} + (i * 8)));
+}
+
+for (int i = 0; i < {{.Arg2}}; i++) {
+    bpf_probe_read(&event->output[outputOffset], 8, &temp_storage[i]);
+    outputOffset += 8;
+}
 `
 
-var variableDereferenceToOutputTemplateText = `
+var dereferenceDynamicToOutputTemplateText = `
+// Arg1 = maximum limit on bytes read
+// Arg2 = number of chunks (should be (max + 7)/8)
+// Arg3 = size of each element
+
+__u64 lengthToRead_{{.InstructionID}} = 0;
+bpf_map_pop_elem(&param_stack, &lengthToRead_{{.InstructionID}});
+
+__u64 addressHolder_{{.InstructionID}} = 0;
+bpf_map_pop_elem(&param_stack, &addressHolder_{{.InstructionID}});
+
+for (i = 0; i < {{.Arg2}}; i++) {
+    chunk_size = (i == {{.Arg2}} - 1 && {{.Arg1}} % 8 != 0) ? ({{.Arg1}} % 8) : 8;
+    bpf_probe_read(&temp_storage[i], chunk_size, (void*)(addressHolder_{{.InstructionID}} + (i * 8)));
+}
+
+for (int i = 0; i < {{.Arg2}}; i++) {
+    bpf_probe_read(&event->output[outputOffset], 8, &temp_storage[i]);
+    outputOffset += 8;
+}
 `
