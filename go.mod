@@ -152,9 +152,9 @@ require (
 	github.com/DataDog/datadog-agent/pkg/security/secl v0.56.0-rc.3
 	github.com/DataDog/datadog-agent/pkg/trace v0.56.0-rc.3
 	github.com/DataDog/datadog-agent/pkg/util/cgroups v0.56.0-rc.3
-	github.com/DataDog/datadog-agent/pkg/util/log v0.57.1
+	github.com/DataDog/datadog-agent/pkg/util/log v0.58.1
 	github.com/DataDog/datadog-agent/pkg/util/pointer v0.57.1
-	github.com/DataDog/datadog-agent/pkg/util/scrubber v0.57.1
+	github.com/DataDog/datadog-agent/pkg/util/scrubber v0.58.1
 	github.com/DataDog/datadog-go/v5 v5.5.0
 	github.com/DataDog/datadog-operator v1.8.0-rc.1
 	github.com/DataDog/ebpf-manager v0.7.1
