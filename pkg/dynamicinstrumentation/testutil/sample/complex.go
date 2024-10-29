@@ -5,6 +5,8 @@
 
 package sample
 
+import "io"
+
 type outer struct {
 	A *middle
 }
@@ -23,6 +25,16 @@ type inner struct {
 //go:noinline
 func test_multiple_dereferences(o outer) {}
 
+type big_struct struct {
+	x []*string
+	z int
+	io.Writer
+}
+
+//nolint:all
+//go:noinline
+func test_big_struct(b big_struct) {}
+
 //nolint:all
 func ExecuteComplexFuncs() {
 	o := outer{
@@ -34,5 +46,6 @@ func ExecuteComplexFuncs() {
 			},
 		},
 	}
+	test_big_struct(big_struct{})
 	test_multiple_dereferences(o)
 }

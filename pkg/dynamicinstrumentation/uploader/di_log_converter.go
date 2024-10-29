@@ -88,7 +88,7 @@ func convertCaptures(defs []ditypes.Parameter, captures []*ditypes.Param) ditype
 }
 
 func reportCaptureError(defs []ditypes.Parameter) ditypes.Captures {
-	notCapturedReason := "Failed to instrument, type is unsupported or too complex. Please report this issue."
+	notCapturedReason := "type unsupported"
 
 	args := make(map[string]*ditypes.CapturedValue)
 	for _, def := range defs {

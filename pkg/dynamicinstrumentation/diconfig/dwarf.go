@@ -222,7 +222,6 @@ func expandTypeData(offset dwarf.Offset, dwarfData *dwarf.Data) (*ditypes.Parame
 		Type:      typeName,
 		TotalSize: typeSize,
 		Kind:      typeKind,
-		Location:  &ditypes.Location{},
 	}
 
 	v, typeParsedAlready := seenTypes[typeHeader.Type]
@@ -280,7 +279,6 @@ func getSliceField(offset dwarf.Offset, dwarfData *dwarf.Data) ([]ditypes.Parame
 		Type:      elementTypeName,
 		TotalSize: elementTypeSize,
 		Kind:      elementTypeKind,
-		Location:  &ditypes.Location{},
 	}
 
 	arrayEntry, err := typeReader.Next()
@@ -369,7 +367,6 @@ func getIndividualArrayElements(offset dwarf.Offset, dwarfData *dwarf.Data) ([]d
 		newParam.Name = fmt.Sprintf("[%d]%s[%d]", arrayLength, elementTypeName, h)
 		newParam.Type = elementTypeName
 		newParam.Kind = elementTypeKind
-		newParam.Location = &ditypes.Location{}
 		newParam.TotalSize = elementTypeSize
 		arrayElements = append(arrayElements, newParam)
 	}

@@ -76,7 +76,7 @@ for (indexSlice{{.Parameter.ID}} = 0; indexSlice{{.Parameter.ID}} < MAX_SLICE_LE
 `
 
 var sliceLengthStackTemplateText = `
-bpf_probe_read(&param_size, sizeof(param_size), &ctx->DWARF_STACK_REGISTER+{{.Parameter.Location.StackOffset}}]);
+bpf_probe_read(&param_size, sizeof(param_size), &ctx->DWARF_STACK_REGISTER+{{.Location.StackOffset}});
 `
 
 // The length of strings aren't known until parsing, so they require
@@ -125,7 +125,7 @@ outputOffset += 3;
 `
 
 var stringLengthStackTemplateText = `
-bpf_probe_read(&param_size, sizeof(param_size), (char*)((ctx->DWARF_STACK_REGISTER)+{{.Location.StackOffset}}));
+bpf_probe_read(&param_size, sizeof(param_size), &ctx->DWARF_STACK_REGISTER+{{.Location.StackOffset}});
 `
 
 // Unsupported types just get a single `255` value to signify as a placeholder
