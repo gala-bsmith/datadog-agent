@@ -222,6 +222,7 @@ func expandTypeData(offset dwarf.Offset, dwarfData *dwarf.Data) (*ditypes.Parame
 		Type:      typeName,
 		TotalSize: typeSize,
 		Kind:      typeKind,
+		Location:  &ditypes.Location{},
 	}
 
 	v, typeParsedAlready := seenTypes[typeHeader.Type]
@@ -237,13 +238,7 @@ func expandTypeData(offset dwarf.Offset, dwarfData *dwarf.Data) (*ditypes.Parame
 		}
 	}
 
-	if typeKind == uint(reflect.Slice) {
-		sliceElements, err := getSliceField(typeEntry.Offset, dwarfData)
-		if err != nil {
-			return nil, fmt.Errorf("could not collect fields of slice type: %w", err)
-		}
-		typeHeader = sliceElements[0]
-	} else if typeEntry.Tag == dwarf.TagStructType {
+	if typeEntry.Tag == dwarf.TagStructType || typeKind == uint(reflect.Slice) || typeKind == uint(reflect.String) {
 		structFields, err := getStructFields(typeEntry.Offset, dwarfData)
 		if err != nil {
 			return nil, fmt.Errorf("could not collect fields of struct type of ditypes.Parameter: %w", err)
@@ -285,6 +280,7 @@ func getSliceField(offset dwarf.Offset, dwarfData *dwarf.Data) ([]ditypes.Parame
 		Type:      elementTypeName,
 		TotalSize: elementTypeSize,
 		Kind:      elementTypeKind,
+		Location:  &ditypes.Location{},
 	}
 
 	arrayEntry, err := typeReader.Next()
@@ -373,6 +369,7 @@ func getIndividualArrayElements(offset dwarf.Offset, dwarfData *dwarf.Data) ([]d
 		newParam.Name = fmt.Sprintf("[%d]%s[%d]", arrayLength, elementTypeName, h)
 		newParam.Type = elementTypeName
 		newParam.Kind = elementTypeKind
+		newParam.Location = &ditypes.Location{}
 		newParam.TotalSize = elementTypeSize
 		arrayElements = append(arrayElements, newParam)
 	}

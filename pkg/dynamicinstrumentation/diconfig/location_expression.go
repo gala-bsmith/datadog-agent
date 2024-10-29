@@ -9,50 +9,23 @@ package diconfig
 
 import (
 	"math/rand"
-	"reflect"
 
 	"github.com/DataDog/datadog-agent/pkg/dynamicinstrumentation/ditypes"
-
-	"github.com/DataDog/datadog-agent/pkg/network/go/bininspect"
 )
 
-func GenerateLocationExpression(parameterMetadata bininspect.ParameterMetadata) []ditypes.LocationExpression {
+// GenerateLocationExpression takes metadata about a parameter, including its type and location, and generates a list of
+// LocationExpressions that can be used to read the parameter from the target process.
+//
+// It walks the tree of the parameter and its pieces, generating LocationExpressions for each piece.
+// The following logic is applied:
+func GenerateLocationExpression(parameter *ditypes.Parameter) {
+	stack := []*ditypes.Parameter{parameter}
 
-	expressions := []ditypes.LocationExpression{}
+	for len(stack) > 0 {
+		// current := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
 
-	if parameterMetadata.Kind == reflect.Uint {
-		if parameterMetadata.Pieces[0].InReg {
-			expressions = append(expressions,
-				ditypes.ReadRegisterLocationExpression(uint(parameterMetadata.Pieces[0].Register), 8),
-				ditypes.PopLocationExpression(1, 8),
-			)
-		}
-	} else if parameterMetadata.Kind == reflect.Pointer {
-		expressions = append(expressions,
-			ditypes.ReadRegisterLocationExpression(uint(parameterMetadata.Pieces[0].Register), 8),
-			ditypes.DereferenceToOutputLocationExpression(8),
-		)
-	} else if parameterMetadata.Kind == reflect.Struct {
-		expressions = append(expressions,
-			ditypes.ReadRegisterLocationExpression(uint(parameterMetadata.Pieces[0].Register), 8),
-			ditypes.PopLocationExpression(1, 8),
-			ditypes.ReadRegisterLocationExpression(uint(parameterMetadata.Pieces[1].Register), 8),
-		)
-	} else if parameterMetadata.Kind == reflect.String {
-		expressions = append(expressions,
-			ditypes.ReadRegisterLocationExpression(0, 8),
-			ditypes.ReadRegisterLocationExpression(1, 8),
-			ditypes.DereferenceDynamicToOutputLocationExpression(20, 1),
-		)
-	} else if parameterMetadata.Kind == reflect.Slice {
-		// expressions = append(expressions,
-		// 	ditypes.ReadRegisterLocationExpression(0, 8),
-		// 	ditypes.ReadRegisterLocationExpression(1, 8),
-		// 	ditypes.DereferenceDynamicLocationExpression(3, 8),
-		// 	ditypes.PopDynamicLocationExpression(24),
-		// )
 	}
-	return expressions
 }
 
 func randomID() string {

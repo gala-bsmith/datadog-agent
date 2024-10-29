@@ -91,7 +91,6 @@ __u64 addressHolder_{{.InstructionID}} = 0;
 bpf_map_pop_elem(&param_stack, &addressHolder_{{.InstructionID}});
 
 // Read {{.Arg1}} bytes from the address that was popped from the stack
-
 __u64 valueHolder_{{.InstructionID}} = 0;
 bpf_probe_read(&valueHolder_{{.InstructionID}}, {{.Arg1}}, (void*)addressHolder_{{.InstructionID}});
 bpf_printk("\tRead %d bytes from %x for value %d", {{.Arg1}}, (void*)addressHolder_{{.InstructionID}}, valueHolder_{{.InstructionID}});
@@ -103,9 +102,6 @@ bpf_printk("\tEncoded value %d", encodedValueHolder_{{.InstructionID}});
 
 bpf_probe_read(&event->output[outputOffset], {{.Arg1}}, &encodedValueHolder_{{.InstructionID}});
 outputOffset += {{.Arg1}};
-
-bpf_probe_read(&event->output[outputOffset], 8, &addressHolder_{{.InstructionID}});
-outputOffset += 8;
 `
 
 var dereferenceLargeTemplateText = `
@@ -200,8 +196,6 @@ for (int i = 0; i < {{.Arg2}}; i++) {
 
 var dereferenceDynamicToOutputTemplateText = `
 // Arg1 = maximum limit on bytes read
-// Arg2 = number of chunks (should be (max + 7)/8)
-// Arg3 = size of each element
 
 __u64 lengthToRead_{{.InstructionID}} = 0;
 bpf_map_pop_elem(&param_stack, &lengthToRead_{{.InstructionID}});
@@ -209,13 +203,12 @@ bpf_map_pop_elem(&param_stack, &lengthToRead_{{.InstructionID}});
 __u64 addressHolder_{{.InstructionID}} = 0;
 bpf_map_pop_elem(&param_stack, &addressHolder_{{.InstructionID}});
 
-for (i = 0; i < {{.Arg2}}; i++) {
-    chunk_size = (i == {{.Arg2}} - 1 && {{.Arg1}} % 8 != 0) ? ({{.Arg1}} % 8) : 8;
-    bpf_probe_read(&temp_storage[i], chunk_size, (void*)(addressHolder_{{.InstructionID}} + (i * 8)));
+__u16 collection_size_{{.InstructionID}};
+collection_size_{{.InstructionID}} = lengthToRead_{{.InstructionID}};
+if (collection_size_{{.InstructionID}} > {{.Arg1}}) {
+    collection_size_{{.InstructionID}} = {{.Arg1}};
 }
 
-for (int i = 0; i < {{.Arg2}}; i++) {
-    bpf_probe_read(&event->output[outputOffset], 8, &temp_storage[i]);
-    outputOffset += 8;
-}
+bpf_probe_read(&event->output[outputOffset], collection_size_{{.InstructionID}}, (void*)addressHolder_{{.InstructionID}});
+outputOffset += collection_size_{{.InstructionID}};
 `

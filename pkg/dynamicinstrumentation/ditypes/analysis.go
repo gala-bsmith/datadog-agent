@@ -41,8 +41,9 @@ type Parameter struct {
 	Type                string
 	TotalSize           int64
 	Kind                uint
-	Location            Location
+	Location            *Location
 	LocationExpressions []LocationExpression
+	FieldOffset         uint64
 	NotCaptureReason    NotCaptureReason
 	ParameterPieces     []Parameter
 }
@@ -156,10 +157,8 @@ func DereferenceDynamicLocationExpression(readLimit, elementSize uint) LocationE
 
 // Maximum limit (Arg1) should be set to the size of each element * max collection length
 // Arg1 = maximum limit on bytes read
-// Arg2 = number of chunks (should be (max + 7)/8)
-// Arg3 = size of each element
 func DereferenceDynamicToOutputLocationExpression(readLimit, elementSize uint) LocationExpression {
-	return LocationExpression{Opcode: OpDereferenceDynamicToOutput, Arg1: readLimit, Arg2: (readLimit + 7) / 8, Arg3: elementSize, InstructionID: randomID()}
+	return LocationExpression{Opcode: OpDereferenceDynamicToOutput, Arg1: readLimit}
 }
 
 // Arg1 = uint value (offset) we're adding to the 8-byte address on top of the stack

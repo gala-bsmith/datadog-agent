@@ -294,7 +294,7 @@ func newConfigProbe() *ditypes.Probe {
 				ArgumentsMaxSize:  100000,
 				StringMaxSize:     30000,
 				MaxFieldCount:     int(ditypes.MaxFieldCount),
-				MaxReferenceDepth: 8,
+				MaxReferenceDepth: 10,
 				CaptureParameters: true,
 			},
 		},

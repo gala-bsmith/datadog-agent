@@ -30,7 +30,7 @@ var (
 	CaptureParameters       = true  // CaptureParameters is the default value for if probes should capture parameter values
 	ArgumentsMaxSize        = 10000 // ArgumentsMaxSize is the default size in bytes of the output buffer used for param values
 	StringMaxSize           = 512   // StringMaxSize is the default size in bytes of a single string
-	MaxReferenceDepth uint8 = 4     // MaxReferenceDepth is the default depth that DI will traverse datatypes for capturing values
+	MaxReferenceDepth uint8 = 10    // MaxReferenceDepth is the default depth that DI will traverse datatypes for capturing values
 	MaxFieldCount           = 20    // MaxFieldCount is the default limit for how many fields DI will capture in a single data type
 	SliceMaxSize            = 1800  // SliceMaxSize is the default limit in bytes of a slice
 	SliceMaxLength          = 100   // SliceMaxLength is the default limit in number of elements of a slice

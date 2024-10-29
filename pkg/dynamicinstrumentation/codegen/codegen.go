@@ -29,7 +29,6 @@ func GenerateBPFParamsCode(procInfo *ditypes.ProcessInfo, probe *ditypes.Probe) 
 
 	if probe.InstrumentationInfo.InstrumentationOptions.CaptureParameters {
 		params := applyCaptureDepth(procInfo.TypeMap.Functions[probe.FuncName], probe.InstrumentationInfo.InstrumentationOptions.MaxReferenceDepth)
-		applyFieldCountLimit(params)
 		for i := range params {
 			flattenedParams := flattenParameters([]ditypes.Parameter{params[i]})
 			err := generateHeadersText(flattenedParams, out)
@@ -53,12 +52,12 @@ func GenerateBPFParamsCode(procInfo *ditypes.ProcessInfo, probe *ditypes.Probe) 
 func resolveHeaderTemplate(param *ditypes.Parameter) (*template.Template, error) {
 	switch param.Kind {
 	case uint(reflect.String):
-		if param.Location.InReg {
+		if param.Location != nil && param.Location.InReg {
 			return template.New("string_reg_header_template").Parse(stringRegisterHeaderTemplateText)
 		}
 		return template.New("string_stack_header_template").Parse(stringStackHeaderTemplateText)
 	case uint(reflect.Slice):
-		if param.Location.InReg {
+		if param.Location != nil && param.Location.InReg {
 			return template.New("slice_reg_header_template").Parse(sliceRegisterHeaderTemplateText)
 		}
 		return template.New("slice_stack_header_template").Parse(sliceStackHeaderTemplateText)
@@ -119,7 +118,7 @@ func resolveLocationExpressionTemplate(locationExpression ditypes.LocationExpres
 		return template.New("read_register_location_expression").Parse(readRegisterTemplateText)
 	}
 	if locationExpression.Opcode == ditypes.OpReadUserStack {
-		return template.New("read)stack_location_expression").Parse(readStackTemplateText)
+		return template.New("read_stack_location_expression").Parse(readStackTemplateText)
 	}
 	if locationExpression.Opcode == ditypes.OpReadUserRegisterToOutput {
 		return template.New("read_register_to_output_location_expression").Parse(readRegisterValueToOutputTemplateText)
@@ -239,7 +238,7 @@ func generateStringLengthHeader(stringLengthParamPiece ditypes.Parameter, buf *b
 		tmplte *template.Template
 		err    error
 	)
-	if stringLengthParamPiece.Location.InReg {
+	if stringLengthParamPiece.Location != nil && stringLengthParamPiece.Location.InReg {
 		tmplte, err = template.New("string_register_length_header").Parse(stringLengthRegisterTemplateText)
 	} else {
 		tmplte, err = template.New("string_stack_length_header").Parse(stringLengthStackTemplateText)
@@ -255,7 +254,7 @@ func generateSliceLengthHeader(sliceLengthParamPiece ditypes.Parameter, buf *byt
 		tmplte *template.Template
 		err    error
 	)
-	if sliceLengthParamPiece.Location.InReg {
+	if sliceLengthParamPiece.Location != nil && sliceLengthParamPiece.Location.InReg {
 		tmplte, err = template.New("slice_register_length_header").Parse(sliceLengthRegisterTemplateText)
 	} else {
 		tmplte, err = template.New("slice_stack_length_header").Parse(sliceLengthStackTemplateText)
