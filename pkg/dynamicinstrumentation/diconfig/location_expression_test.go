@@ -29,7 +29,7 @@ func TestLocationExpressionGeneration(t *testing.T) {
 				TotalSize: 8,
 				Kind:      reflect.Uint,
 				Pieces: []bininspect.ParameterPiece{
-					{Size: 0, InReg: true, StackOffset: 0, Register: 0},
+					{Size: 8, InReg: true, StackOffset: 0, Register: 0},
 				},
 			},
 			ExpectedOutput: []ditypes.LocationExpression{

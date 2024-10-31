@@ -43,7 +43,22 @@ func TestExpressionsInstrumentation(t *testing.T) {
 		{
 			Name:        "test2",
 			FuncName:    "test_uint_slice",
-			Expressions: []ditypes.LocationExpression{},
+			Expressions: []ditypes.LocationExpression{
+				/*
+					Read reg 0 ptr
+					Apply offset 0
+					Read reg 1 len
+					Dynamic dereference 8
+					Read reg 0 ptr
+					Apply offset 8
+					Read reg 1 len
+					Dynamic dereference 8
+					Read reg 0 ptr
+					Apply offset 16
+					Read reg 1 len
+					Dynamic dereference 8
+				*/
+			},
 			ExpectedArgData: []*ditypes.Param{
 				{
 					ValueStr: "",

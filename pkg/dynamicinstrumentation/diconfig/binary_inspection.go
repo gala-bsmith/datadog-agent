@@ -174,7 +174,6 @@ func putLocationsInParams(
 	for i := range params {
 		correctStructLocations(&params[i], fieldLocations)
 	}
-	pretty.Log("Params after location assignment: ", params)
 	funcMap[funcName] = params
 }
 

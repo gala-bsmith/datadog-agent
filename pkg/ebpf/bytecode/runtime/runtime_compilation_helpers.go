@@ -60,6 +60,7 @@ func compileToObjectFile(inFile, outputDir, filename, inHash string, additionalF
 		return nil, outputFileErr, fmt.Errorf("unable to get output file path: %w", err)
 	}
 
+	log.Debugf("Compiling to %s", outputFile)
 	var result CompilationResult
 	if _, err := os.Stat(outputFile); err != nil {
 		if !os.IsNotExist(err) {

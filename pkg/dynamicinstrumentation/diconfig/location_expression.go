@@ -9,7 +9,6 @@ package diconfig
 
 import (
 	"math/rand"
-	"os"
 	"reflect"
 	"strings"
 
@@ -27,13 +26,79 @@ func GenerateLocationExpression(parameter *ditypes.Parameter) {
 	pretty.Log("All:\n", m)
 	pretty.Log("Needs expressions:\n", expressionTargets)
 
-	for typePath, parameter := range expressionTargets {
-		types := strings.Split(typePath, ">>>")
-		locationExpression := []ditypes.LocationExpression{}
+	for target, parameter := range expressionTargets {
+		expressions := []ditypes.LocationExpression{}
+		pathElements := []string{target}
+		for {
+			lastElementIndex := strings.LastIndex(target, "@")
+			if lastElementIndex == -1 {
+				break
+			}
+			target = target[:lastElementIndex]
+			pathElements = append([]string{target}, pathElements...)
+		}
 
+		for i := range pathElements {
+			elementParam, ok := m[pathElements[i]]
+			if !ok {
+				continue
+			}
+			// Check if this instrumentation target is directly assigned
+			if elementParam.Location != nil {
+				expressions = append(expressions, ditypes.DirectReadLocationExpression(elementParam))
+				if elementParam.Kind != uint(reflect.Pointer) {
+					// Since this isn't a pointer, we can just directly read
+					expressions = append(expressions, ditypes.PopLocationExpression(1, uint(elementParam.TotalSize)))
+				}
+				continue
+			} else {
+				// This is not directly assigned, expect the address for it on the stack
+				if elementParam.Kind == uint(reflect.Pointer) {
+					expressions = append(expressions,
+						ditypes.DirectReadLocationExpression(elementParam),
+					)
+					if len(elementParam.ParameterPieces) > 0 &&
+						(elementParam.ParameterPieces[0].Kind == uint(reflect.String) ||
+							elementParam.ParameterPieces[0].Kind == uint(reflect.Slice)) {
+						// In the special case of pointers to strings and slices, we need the address pushed twice
+						// to the stack for the sake of parsing both relevant fields (len/ptr).
+						expressions = append(expressions,
+							ditypes.DirectReadLocationExpression(elementParam),
+						)
+					}
+				} else if elementParam.Kind == uint(reflect.Struct) {
+					// Structs don't provide context on location, or have values themselves
+					continue
+				} else if elementParam.Kind == uint(reflect.String) {
+					if len(parameter.ParameterPieces) != 2 {
+						continue
+					}
+					str := parameter.ParameterPieces[0]
+					len := parameter.ParameterPieces[1]
+					if str.Location != nil && len.Location != nil {
+						// Fields of the string are directly assigned
+						expressions = append(expressions,
+							ditypes.DirectReadLocationExpression(&str),
+							ditypes.DirectReadLocationExpression(&len),
+							ditypes.DereferenceDynamicToOutputLocationExpression(32, 1), //TODO: use actual limit
+						)
+					} else {
+						// Expect address on stack, use offsets accordingly
+						expressions = append(expressions,
+							ditypes.ApplyOffsetLocationExpression(uint(len.FieldOffset)),
+							ditypes.DereferenceLocationExpression(uint(len.TotalSize)),
+							ditypes.DereferenceDynamicToOutputLocationExpression(32, 1),
+						)
+					}
+					continue
+				} else {
+					expressions = append(expressions, ditypes.ApplyOffsetLocationExpression(uint(elementParam.FieldOffset)), ditypes.DereferenceToOutputLocationExpression(uint(elementParam.TotalSize)))
+				}
+			}
+		}
+		parameter.LocationExpressions = expressions
+		pretty.Log("Produced expressions:", parameter.LocationExpressions)
 	}
-
-	os.Exit(0)
 }
 
 // - Can read address of pointers twice so the address stays on stack.
@@ -61,7 +126,7 @@ func generateLocationVisitsMap(parameter *ditypes.Parameter) (map[string]*ditype
 		}
 
 		for i := range param.ParameterPieces {
-			newPath := path + param.Type + ">>>"
+			newPath := path + param.Type + "@"
 			visit(&param.ParameterPieces[i], newPath)
 		}
 	}

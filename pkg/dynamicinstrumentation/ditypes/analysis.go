@@ -101,6 +101,26 @@ const (
 	OpPopDynamic
 )
 
+func DirectReadLocationExpression(p *Parameter) LocationExpression {
+	if p == nil || p.Location == nil {
+		return LocationExpression{Opcode: OpInvalid}
+	}
+	if p.Location.InReg {
+		return ReadRegisterLocationExpression(uint(p.Location.Register), uint(p.TotalSize))
+	}
+	return ReadStackLocationExpression(uint(p.Location.StackOffset), uint(p.TotalSize))
+}
+
+func DirectReadToOutputLocationExpression(p *Parameter) LocationExpression {
+	if p == nil || p.Location == nil {
+		return LocationExpression{Opcode: OpInvalid}
+	}
+	if p.Location.InReg {
+		return ReadRegisterToOutputLocationExpression(uint(p.Location.Register), uint(p.TotalSize))
+	}
+	return ReadStackToOutputLocationExpression(uint(p.Location.StackOffset), uint(p.TotalSize))
+}
+
 // Arg1 = register
 // Arg2 = size of element
 func ReadRegisterLocationExpression(register, size uint) LocationExpression {
@@ -127,11 +147,17 @@ func ReadStackToOutputLocationExpression(offset, size uint) LocationExpression {
 
 // Arg1 = size of value we're reading from the 8 byte address at the top of the stack
 func DereferenceLocationExpression(valueSize uint) LocationExpression {
+	if valueSize > 8 {
+		return LocationExpression{Opcode: OpDereferenceLarge, Arg1: valueSize, Arg2: (valueSize + 7) / 8, InstructionID: randomID()}
+	}
 	return LocationExpression{Opcode: OpDereference, Arg1: valueSize, InstructionID: randomID()}
 }
 
 // Arg1 = size of value we're reading from the 8 byte address at the top of the stack
 func DereferenceToOutputLocationExpression(valueSize uint) LocationExpression {
+	if valueSize > 8 {
+		return LocationExpression{Opcode: OpDereferenceLargeToOutput, Arg1: valueSize, Arg2: (valueSize + 7) / 8, InstructionID: randomID()}
+	}
 	return LocationExpression{Opcode: OpDereferenceToOutput, Arg1: valueSize, InstructionID: randomID()}
 }
 
