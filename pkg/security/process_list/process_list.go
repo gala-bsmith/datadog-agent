@@ -153,6 +153,15 @@ func (pl *ProcessList) isEventValid(event *model.Event) (bool, error) {
 		return false, errors.New("event without process context")
 	}
 
+	// check selector
+	if event.ContainerContext == nil {
+		return false, errors.New("event without container context")
+	}
+	eventSelector := cgroupModel.NewWorkloadSelectorFromContainerContext(event.ContainerContext)
+	if !pl.selector.Match(eventSelector) {
+		return false, nil
+	}
+
 	// check event type
 	if !slices.Contains(pl.validEventTypes, event.GetEventType()) {
 		return false, errors.New("event type unvalid")
@@ -256,8 +265,9 @@ func (pl *ProcessList) findOrInsertExec(event *model.Event, insertMissingProcess
 			parentKey := pl.owner.GetParentProcessCacheKey(&current.Process)
 			if parentKey != nil {
 				ok := false
-				insertFrom, ok = pl.processCache[parentKey]
+				parent, ok := pl.processCache[parentKey]
 				if ok {
+					insertFrom = parent
 					break
 				}
 			}
@@ -266,8 +276,12 @@ func (pl *ProcessList) findOrInsertExec(event *model.Event, insertMissingProcess
 			break
 		}
 
-		// check if we already have its parent
 		parent := &current.Ancestor.ProcessContext
+		if current.PPid != parent.Pid {
+			return nil, false, errors.New("broken lineage")
+		}
+
+		// check if we already have its parent
 		parentKey := pl.owner.GetProcessCacheKey(&parent.Process)
 		if parentKey != nil {
 			parentNode, ok := pl.processCache[parentKey]
@@ -295,15 +309,15 @@ func (pl *ProcessList) findOrInsertExec(event *model.Event, insertMissingProcess
 		}
 	}
 
+	if insertFrom == nil {
+		// didn't find any existing parents or suitable root node in ancestors
+		return nil, false, errors.New("didn't find any existing parents or suitable root node")
+	}
+
 	// and loop til lineage is empty
 	for lineageToAddIndex >= 0 {
 		insertFrom = pl.insertChildFromProcess(insertFrom, &lineageToAdd[lineageToAddIndex].Process)
 		lineageToAddIndex--
-	}
-
-	if insertFrom == nil {
-		// didn't find any exiting parents or suitable root node in ancestors
-		return nil, false, nil
 	}
 	return insertFrom.CurrentExec, true, nil
 }

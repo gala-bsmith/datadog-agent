@@ -21,26 +21,64 @@ import (
 )
 
 var (
-	ErrNoImageProvided = errors.New("no image name provided") // ErrNoImageProvided is returned when no image name is provided
+	ErrNoImageProvided       = errors.New("no image name provided")  // ErrNoImageProvided is returned when no image name is provided
+	ErrNoContainerIDProvided = errors.New("no containerID provided") // ErrNoContainerIDProvided is returned when no containerID is provided
 )
 
 // WorkloadSelector is a selector used to uniquely indentify the image of a workload
 type WorkloadSelector struct {
-	Image string
-	Tag   string
+	Image       string
+	Tag         string
+	ContainerID string
 }
 
-// NewWorkloadSelector returns an initialized instance of a WorkloadSelector
-func NewWorkloadSelector(image string, tag string) (WorkloadSelector, error) {
+// NewSelector returns an initialized instance of a WorkloadSelector
+func NewSelector(image string, tag string, containerID string) (WorkloadSelector, error) {
 	if image == "" {
 		return WorkloadSelector{}, ErrNoImageProvided
+	} else if containerID == "" {
+		return WorkloadSelector{}, ErrNoContainerIDProvided
 	} else if tag == "" {
 		tag = "latest"
 	}
 	return WorkloadSelector{
-		Image: image,
-		Tag:   tag,
+		Image:       image,
+		Tag:         tag,
+		ContainerID: containerID,
 	}, nil
+}
+
+// NewWorkloadSelector returns an initialized instance of a WorkloadSelector for an image
+func NewWorkloadSelector(image string, tag string) (WorkloadSelector, error) {
+	return NewSelector(image, tag, "*")
+}
+
+// NewContainerSelector returns an initialized instance of a WorkloadSelector for a single container
+func NewContainerSelector(containerID string) (WorkloadSelector, error) {
+	return NewSelector("*", "*", containerID)
+}
+
+func NewWorkloadSelectorFromContainerContext(cc *model.ContainerContext) WorkloadSelector {
+	ws := WorkloadSelector{
+		Image:       utils.GetTagValue("image_name", cc.Tags),
+		Tag:         utils.GetTagValue("image_tag", cc.Tags),
+		ContainerID: string(cc.ContainerID),
+	}
+	if ws.Image == "" {
+		ws.Image = "*"
+	}
+	if ws.Tag == "" {
+		ws.Tag = "*"
+	}
+	return ws
+}
+
+func (ws *WorkloadSelector) Copy() *WorkloadSelector {
+	return &WorkloadSelector{
+		Image:       ws.Image,
+		Tag:         ws.Tag,
+		ContainerID: ws.ContainerID,
+	}
 }
 
 // IsReady returns true if the selector is ready
@@ -50,18 +88,21 @@ func (ws *WorkloadSelector) IsReady() bool {
 
 // Match returns true if the input selector matches the current selector
 func (ws *WorkloadSelector) Match(selector WorkloadSelector) bool {
-	if ws.Tag == "*" || selector.Tag == "*" {
-		return ws.Image == selector.Image
+	if ws.ContainerID == "*" || selector.ContainerID == "*" {
+		if ws.Tag == "*" || selector.Tag == "*" {
+			return ws.Image == selector.Image
+		}
+		return ws.Image == selector.Image && ws.Tag == selector.Tag
 	}
-	return ws.Image == selector.Image && ws.Tag == selector.Tag
+	return ws.Image == selector.Image && ws.Tag == selector.Tag && ws.ContainerID == selector.ContainerID
 }
 
 // String returns a string representation of a workload selector
 func (ws WorkloadSelector) String() string {
-	return fmt.Sprintf("[image_name:%s image_tag:%s]", ws.Image, ws.Tag)
+	return fmt.Sprintf("[image_name:%s image_tag:%s container_id:%s]", ws.Image, ws.Tag, ws.ContainerID)
 }
 
-// ToTags returns a string array representation of a workload selector
+// ToTags returns a string array representation of a workload selector, used in profile manger to send stats
 func (ws WorkloadSelector) ToTags() []string {
 	return []string{
 		"image_name:" + ws.Image,
@@ -148,10 +189,7 @@ func (cgce *CacheEntry) GetWorkloadSelectorCopy() *WorkloadSelector {
 	cgce.Lock()
 	defer cgce.Unlock()
 
-	return &WorkloadSelector{
-		Image: cgce.WorkloadSelector.Image,
-		Tag:   cgce.WorkloadSelector.Tag,
-	}
+	return cgce.WorkloadSelector.Copy()
 }
 
 // NeedsTagsResolution returns true if this workload is missing its tags

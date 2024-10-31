@@ -169,7 +169,10 @@ func (pn *ProcessNode) Debug(w io.Writer, prefix string) {
 	pn.Lock()
 	defer pn.Unlock()
 
-	pn.CurrentExec.Debug(w, prefix)
+	// pn.CurrentExec.Debug(w, prefix)
+	for _, exec := range pn.PossibleExecs {
+		exec.Debug(w, prefix)
+	}
 	prefix = prefix + "  "
 	fmt.Fprintf(w, prefix+"%d children:\n", len(pn.Children))
 	for _, child := range pn.Children {
