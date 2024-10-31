@@ -1,0 +1,8 @@
+version: '3'
+name: python-http-server
+services:
+  server:
+    image: public.ecr.aws/docker/library/python:3
+    command: "python -m http.server 8090"
+    ports:
+      - "8090:8090"
