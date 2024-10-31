@@ -58,6 +58,7 @@ func NewContainerSelector(containerID string) (WorkloadSelector, error) {
 	return NewSelector("*", "*", containerID)
 }
 
+// NewWorkloadSelectorFromContainerContext returns a workload selector corresponding to the given container context
 func NewWorkloadSelectorFromContainerContext(cc *model.ContainerContext) WorkloadSelector {
 	ws := WorkloadSelector{
 		Image:       utils.GetTagValue("image_name", cc.Tags),
@@ -73,6 +74,7 @@ func NewWorkloadSelectorFromContainerContext(cc *model.ContainerContext) Workloa
 	return ws
 }
 
+// Copy returns a copy of itself
 func (ws *WorkloadSelector) Copy() *WorkloadSelector {
 	return &WorkloadSelector{
 		Image:       ws.Image,

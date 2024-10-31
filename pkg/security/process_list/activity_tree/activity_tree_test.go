@@ -42,18 +42,15 @@ type testIteration struct {
 }
 
 var (
-	defaultContainerID  string = "424242424242424242424242424242424242424242424242424242424242424"
-	defaultContainerID2 string = "515151515151515151515151515151515151515151515151515151515151515"
+	defaultContainerID  = "424242424242424242424242424242424242424242424242424242424242424"
+	defaultContainerID2 = "515151515151515151515151515151515151515151515151515151515151515"
 )
 
 func matchResultTree(pl *processlist.ProcessList, toMatch map[string][]string) bool {
 	// pl.Debug(os.Stdout)
 	rootNodes := pl.GetChildren()
 	if rootNodes == nil {
-		if len(toMatch) == 0 {
-			return true
-		}
-		return false
+		return len(toMatch) == 0
 	}
 
 	if len(*rootNodes) != len(toMatch) {
@@ -288,7 +285,7 @@ func TestActivityTree_CreateProcessNode(t *testing.T) {
 	}
 
 	at := NewActivityTree(nil, false, 3)
-	var pl *processlist.ProcessList = nil
+	var pl *processlist.ProcessList
 
 	for _, ti := range tests {
 		t.Run(ti.testName, func(t *testing.T) {
