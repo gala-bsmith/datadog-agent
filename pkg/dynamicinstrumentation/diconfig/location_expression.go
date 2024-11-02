@@ -8,6 +8,7 @@
 package diconfig
 
 import (
+	"fmt"
 	"math/rand"
 	"reflect"
 	"strings"
@@ -23,8 +24,6 @@ import (
 // The following logic is applied:
 func GenerateLocationExpression(parameter *ditypes.Parameter) {
 	m, expressionTargets := generateLocationVisitsMap(parameter)
-	pretty.Log("All:\n", m)
-	pretty.Log("Needs expressions:\n", expressionTargets)
 
 	for target, parameter := range expressionTargets {
 		expressions := []ditypes.LocationExpression{}
@@ -43,8 +42,16 @@ func GenerateLocationExpression(parameter *ditypes.Parameter) {
 			if !ok {
 				continue
 			}
+
 			// Check if this instrumentation target is directly assigned
 			if elementParam.Location != nil {
+				fmt.Println("DIRECTLY ASSIGNED!")
+				// This element is directly assigned
+
+				if elementParam.Kind == uint(reflect.Array) {
+					//TODO
+				}
+
 				expressions = append(expressions, ditypes.DirectReadLocationExpression(elementParam))
 				if elementParam.Kind != uint(reflect.Pointer) {
 					// Since this isn't a pointer, we can just directly read
@@ -52,6 +59,7 @@ func GenerateLocationExpression(parameter *ditypes.Parameter) {
 				}
 				continue
 			} else {
+				fmt.Println("NOT DIRECTLY ASSIGNED!")
 				// This is not directly assigned, expect the address for it on the stack
 				if elementParam.Kind == uint(reflect.Pointer) {
 					expressions = append(expressions,
@@ -80,7 +88,7 @@ func GenerateLocationExpression(parameter *ditypes.Parameter) {
 						expressions = append(expressions,
 							ditypes.DirectReadLocationExpression(&str),
 							ditypes.DirectReadLocationExpression(&len),
-							ditypes.DereferenceDynamicToOutputLocationExpression(32, 1), //TODO: use actual limit
+							ditypes.DereferenceDynamicToOutputLocationExpression(32, 1), //FIXME: use actual limit
 						)
 					} else {
 						// Expect address on stack, use offsets accordingly
@@ -91,6 +99,35 @@ func GenerateLocationExpression(parameter *ditypes.Parameter) {
 						)
 					}
 					continue
+				} else if elementParam.Kind == uint(reflect.Slice) {
+					if len(elementParam.ParameterPieces) != 3 {
+						continue
+					}
+					ptr := elementParam.ParameterPieces[0]
+					len := elementParam.ParameterPieces[1]
+
+					GenerateLocationExpression(&ptr.ParameterPieces[0])
+					expressionsToUseForEachSliceElement := collectAndRemoveLocationExpressions(&ptr.ParameterPieces[0])
+
+					// For each element,
+					// - Read the slice ptr to stack
+					// - Add offset equal to (i*slice_element_size)  ( i is loop for the 0->max slice length )
+					// - append the above expressionsToUseForEachSliceElement
+					//
+					// Need a way to short circuit slices:
+					// - instruction in between each element that reads the slice length and compares it to current
+					//   instruction being read (i.e. pass in `i`)
+
+					if ptr.Location != nil && len.Location != nil {
+						// Fields of the slice are directly assigned
+						expressions = append(expressions,
+							ditypes.DirectReadLocationExpression(&ptr),
+						)
+					} else {
+						// Expect address on stack, use offsets accordingly
+						expressions = append(expressions)
+					}
+					continue
 				} else {
 					expressions = append(expressions, ditypes.ApplyOffsetLocationExpression(uint(elementParam.FieldOffset)), ditypes.DereferenceToOutputLocationExpression(uint(elementParam.TotalSize)))
 				}
@@ -99,6 +136,31 @@ func GenerateLocationExpression(parameter *ditypes.Parameter) {
 		parameter.LocationExpressions = expressions
 		pretty.Log("Produced expressions:", parameter.LocationExpressions)
 	}
+}
+
+// collectAndRemoveLocationExpressions goes through the parameter tree (param.ParameterPieces) via
+// depth first traversal, collecting the LocationExpression's from each parameter and appending them
+// to a collective slice. As it collects the location expressions, it removes them from that parameter.
+func collectAndRemoveLocationExpressions(param *ditypes.Parameter) []ditypes.LocationExpression {
+	collectedExpressions := []ditypes.LocationExpression{}
+	queue := []*ditypes.Parameter{param}
+	var top *ditypes.Parameter
+
+	for {
+		if len(queue) == 0 {
+			break
+		}
+		top = queue[0]
+		queue = queue[1:]
+		for i := range top.ParameterPieces {
+			queue = append(queue, &top.ParameterPieces[i])
+		}
+		if len(top.LocationExpressions) > 0 {
+			collectedExpressions = append(top.LocationExpressions, collectedExpressions...)
+			top.LocationExpressions = []ditypes.LocationExpression{}
+		}
+	}
+	return collectedExpressions
 }
 
 // - Can read address of pointers twice so the address stays on stack.
