@@ -19,6 +19,7 @@ import (
 	"os/exec"
 	"path"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -724,6 +725,11 @@ func genTestConfigs(cfgDir string, opts testOpts) (*emconfig.Config, *secconfig.
 
 	if opts.activityDumpSyscallMonitorPeriod == time.Duration(0) {
 		opts.activityDumpSyscallMonitorPeriod = 60 * time.Second
+	}
+
+	if runtime.GOOS == "windows" {
+		opts.disableApprovers = true
+		opts.disableDiscarders = true
 	}
 
 	buffer := new(bytes.Buffer)
