@@ -1186,7 +1186,8 @@ func initializeWindowsProbe(config *config.Config, opts Opts) (*WindowsProbe, er
 		return nil, err
 	}
 
-	bocs := config.RuntimeSecurity.WindowsProbeBlockOnChannelSend
+	// bocs := config.RuntimeSecurity.WindowsProbeBlockOnChannelSend
+	bocs := true // debug always block
 
 	etwNotificationSize := config.RuntimeSecurity.ETWEventsChannelSize
 	log.Infof("Setting ETW channel size to %d", etwNotificationSize)
