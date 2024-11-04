@@ -212,3 +212,9 @@ if (collection_size_{{.InstructionID}} > {{.Arg1}}) {
 bpf_probe_read(&event->output[outputOffset], collection_size_{{.InstructionID}}, (void*)addressHolder_{{.InstructionID}});
 outputOffset += collection_size_{{.InstructionID}};
 `
+
+var copyTemplateText = `
+__u64 holder_{{.InstructionID}};
+bpf_map_peek_elem(&param_stack, &holder_{{.InstructionID}});
+bpf_map_push_elem(&param_stack, &holder_{{.InstructionID}});
+`

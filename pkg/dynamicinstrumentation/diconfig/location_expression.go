@@ -8,13 +8,10 @@
 package diconfig
 
 import (
-	"fmt"
-	"math/rand"
 	"reflect"
 	"strings"
 
 	"github.com/DataDog/datadog-agent/pkg/dynamicinstrumentation/ditypes"
-	"github.com/kr/pretty"
 )
 
 // GenerateLocationExpression takes metadata about a parameter, including its type and location, and generates a list of
@@ -22,47 +19,45 @@ import (
 //
 // It walks the tree of the parameter and its pieces, generating LocationExpressions for each piece.
 // The following logic is applied:
-func GenerateLocationExpression(parameter *ditypes.Parameter) {
-	m, expressionTargets := generateLocationVisitsMap(parameter)
-
-	for target, parameter := range expressionTargets {
-		expressions := []ditypes.LocationExpression{}
-		pathElements := []string{target}
+func GenerateLocationExpression(param *ditypes.Parameter) {
+	triePaths, expressionTargets := generateLocationVisitsMap(param)
+	for pathToInstrumentationTarget, instrumentationTarget := range expressionTargets {
+		pathElements := []string{pathToInstrumentationTarget}
+		// pathElements gets populated with every individual stretch of the path to the instrumentationTarget
 		for {
-			lastElementIndex := strings.LastIndex(target, "@")
+			lastElementIndex := strings.LastIndex(pathToInstrumentationTarget, "@")
 			if lastElementIndex == -1 {
 				break
 			}
-			target = target[:lastElementIndex]
-			pathElements = append([]string{target}, pathElements...)
+			pathToInstrumentationTarget = pathToInstrumentationTarget[:lastElementIndex]
+			pathElements = append([]string{pathToInstrumentationTarget}, pathElements...)
 		}
 
+		// Go through each path element of the instrumentation target
 		for i := range pathElements {
-			elementParam, ok := m[pathElements[i]]
+			elementParam, ok := triePaths[pathElements[i]]
 			if !ok {
 				continue
 			}
 
 			// Check if this instrumentation target is directly assigned
 			if elementParam.Location != nil {
-				fmt.Println("DIRECTLY ASSIGNED!")
 				// This element is directly assigned
 
 				if elementParam.Kind == uint(reflect.Array) {
 					//TODO
 				}
 
-				expressions = append(expressions, ditypes.DirectReadLocationExpression(elementParam))
+				elementParam.LocationExpressions = append(elementParam.LocationExpressions, ditypes.DirectReadLocationExpression(elementParam))
 				if elementParam.Kind != uint(reflect.Pointer) {
 					// Since this isn't a pointer, we can just directly read
-					expressions = append(expressions, ditypes.PopLocationExpression(1, uint(elementParam.TotalSize)))
+					elementParam.LocationExpressions = append(elementParam.LocationExpressions, ditypes.PopLocationExpression(1, uint(elementParam.TotalSize)))
 				}
 				continue
 			} else {
-				fmt.Println("NOT DIRECTLY ASSIGNED!")
 				// This is not directly assigned, expect the address for it on the stack
 				if elementParam.Kind == uint(reflect.Pointer) {
-					expressions = append(expressions,
+					elementParam.LocationExpressions = append(elementParam.LocationExpressions,
 						ditypes.DirectReadLocationExpression(elementParam),
 					)
 					if len(elementParam.ParameterPieces) > 0 &&
@@ -70,7 +65,7 @@ func GenerateLocationExpression(parameter *ditypes.Parameter) {
 							elementParam.ParameterPieces[0].Kind == uint(reflect.Slice)) {
 						// In the special case of pointers to strings and slices, we need the address pushed twice
 						// to the stack for the sake of parsing both relevant fields (len/ptr).
-						expressions = append(expressions,
+						elementParam.LocationExpressions = append(elementParam.LocationExpressions,
 							ditypes.DirectReadLocationExpression(elementParam),
 						)
 					}
@@ -78,24 +73,23 @@ func GenerateLocationExpression(parameter *ditypes.Parameter) {
 					// Structs don't provide context on location, or have values themselves
 					continue
 				} else if elementParam.Kind == uint(reflect.String) {
-					if len(parameter.ParameterPieces) != 2 {
+					if len(instrumentationTarget.ParameterPieces) != 2 {
 						continue
 					}
-					str := parameter.ParameterPieces[0]
-					len := parameter.ParameterPieces[1]
+					str := instrumentationTarget.ParameterPieces[0]
+					len := instrumentationTarget.ParameterPieces[1]
 					if str.Location != nil && len.Location != nil {
 						// Fields of the string are directly assigned
-						expressions = append(expressions,
+						elementParam.LocationExpressions = append(elementParam.LocationExpressions,
 							ditypes.DirectReadLocationExpression(&str),
 							ditypes.DirectReadLocationExpression(&len),
 							ditypes.DereferenceDynamicToOutputLocationExpression(32, 1), //FIXME: use actual limit
 						)
 					} else {
-						// Expect address on stack, use offsets accordingly
-						expressions = append(expressions,
-							ditypes.ApplyOffsetLocationExpression(uint(len.FieldOffset)),
-							ditypes.DereferenceLocationExpression(uint(len.TotalSize)),
-							ditypes.DereferenceDynamicToOutputLocationExpression(32, 1),
+						// Expect address of the string struct itself on the location expression stack
+						elementParam.LocationExpressions = append(elementParam.LocationExpressions,
+							ditypes.DereferenceLocationExpression(8),         // Put the char pointer onto the stack
+							ditypes.DereferenceToOutputLocationExpression(3), // FIXME: this hardcodes string at 3 bytes
 						)
 					}
 					continue
@@ -103,38 +97,54 @@ func GenerateLocationExpression(parameter *ditypes.Parameter) {
 					if len(elementParam.ParameterPieces) != 3 {
 						continue
 					}
+
+					// For each element in the slice:
+					// - Read the pointer to the array onto the stack
+					// - Add offset equal to (i*slice_element_size)  ( i is loop for the 0:max_slice_length )
+					// - Append the expressions for reading the kind of element, which expect the address of it on the stack
+
 					ptr := elementParam.ParameterPieces[0]
 					len := elementParam.ParameterPieces[1]
+					sliceElementType := ptr.ParameterPieces[0]
 
+					// Generate and collect the location expressions for collecting an individual
+					// element of this slice
 					GenerateLocationExpression(&ptr.ParameterPieces[0])
 					expressionsToUseForEachSliceElement := collectAndRemoveLocationExpressions(&ptr.ParameterPieces[0])
 
-					// For each element,
-					// - Read the slice ptr to stack
-					// - Add offset equal to (i*slice_element_size)  ( i is loop for the 0->max slice length )
-					// - append the above expressionsToUseForEachSliceElement
-					//
-					// Need a way to short circuit slices:
+					// TODO: Need a way to short circuit slices:
 					// - instruction in between each element that reads the slice length and compares it to current
 					//   instruction being read (i.e. pass in `i`)
 
 					if ptr.Location != nil && len.Location != nil {
 						// Fields of the slice are directly assigned
-						expressions = append(expressions,
-							ditypes.DirectReadLocationExpression(&ptr),
-						)
+						for i := 0; i < 3; i++ { //FIXME: replace 3 with actual max collection length
+							elementParam.LocationExpressions = append(elementParam.LocationExpressions,
+								ditypes.DirectReadLocationExpression(&ptr),
+								ditypes.ApplyOffsetLocationExpression(uint(sliceElementType.TotalSize)*uint(i)),
+							)
+							elementParam.LocationExpressions = append(elementParam.LocationExpressions, expressionsToUseForEachSliceElement...)
+						}
 					} else {
 						// Expect address on stack, use offsets accordingly
-						expressions = append(expressions)
+						elementParam.LocationExpressions = append(elementParam.LocationExpressions,
+							ditypes.DereferenceLocationExpression(8), // Put the array pointer onto the stack
+						)
+
+						for i := 0; i < 3; i++ { //FIXME: replace 3 with actual max collection length
+							elementParam.LocationExpressions = append(elementParam.LocationExpressions,
+								ditypes.CopyLocationExpression(),
+								ditypes.ApplyOffsetLocationExpression(uint(i*(int(sliceElementType.TotalSize)))),
+							)
+							elementParam.LocationExpressions = append(elementParam.LocationExpressions, expressionsToUseForEachSliceElement...)
+						}
 					}
 					continue
 				} else {
-					expressions = append(expressions, ditypes.ApplyOffsetLocationExpression(uint(elementParam.FieldOffset)), ditypes.DereferenceToOutputLocationExpression(uint(elementParam.TotalSize)))
+					elementParam.LocationExpressions = append(elementParam.LocationExpressions, ditypes.ApplyOffsetLocationExpression(uint(elementParam.FieldOffset)), ditypes.DereferenceToOutputLocationExpression(uint(elementParam.TotalSize)))
 				}
 			}
 		}
-		parameter.LocationExpressions = expressions
-		pretty.Log("Produced expressions:", parameter.LocationExpressions)
 	}
 }
 
@@ -163,18 +173,12 @@ func collectAndRemoveLocationExpressions(param *ditypes.Parameter) []ditypes.Loc
 	return collectedExpressions
 }
 
-// - Can read address of pointers twice so the address stays on stack.
-// - At the end of programs have an instruction for popping remainder of stack
-// - Probably makes sense to set locations from parent parameter while going through pieces, then
-//   calling the recursive function on the pieces
-
 // generateLocationVisitsMap follows the tree of parameters (parameter.ParameterPieces), and
-// collects string values of all the paths to leaf nodes, and sets it in returned map pointing
-// to the location of that leaf node. The string values are a concatanation of the Type fields
-// of all the parameters in the path.
-func generateLocationVisitsMap(parameter *ditypes.Parameter) (map[string]*ditypes.Parameter, map[string]*ditypes.Parameter) {
-	trieKeys := map[string]*ditypes.Parameter{}
-	needsExpressions := map[string]*ditypes.Parameter{}
+// collects string values of all the paths to nodes that need expressions (`needsExpressions`),
+// as well as all combinations of elements that can be achieved by walking the tree (`trieKeys`).
+func generateLocationVisitsMap(parameter *ditypes.Parameter) (trieKeys map[string]*ditypes.Parameter, needsExpressions map[string]*ditypes.Parameter) {
+	trieKeys = map[string]*ditypes.Parameter{}
+	needsExpressions = map[string]*ditypes.Parameter{}
 
 	var visit func(param *ditypes.Parameter, path string)
 	visit = func(param *ditypes.Parameter, path string) {
@@ -182,7 +186,8 @@ func generateLocationVisitsMap(parameter *ditypes.Parameter) (map[string]*ditype
 
 		if len(param.ParameterPieces) == 0 ||
 			isBasicType(param.Kind) ||
-			param.Kind == uint(reflect.Array) {
+			param.Kind == uint(reflect.Array) ||
+			param.Kind == uint(reflect.Slice) {
 			needsExpressions[path+param.Type] = param
 			return
 		}
@@ -205,15 +210,6 @@ func isBasicType(kind uint) bool {
 	default:
 		return false
 	}
-}
-
-func randomID() string {
-	length := 6
-	randomString := make([]byte, length)
-	for i := 0; i < length; i++ {
-		randomString[i] = byte(65 + rand.Intn(25))
-	}
-	return string(randomString)
 }
 
 /*

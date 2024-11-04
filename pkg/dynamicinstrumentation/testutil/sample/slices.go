@@ -33,11 +33,16 @@ func test_uint_slice(u []uint) {}
 func test_struct_slice(xs []structWithNoStrings) {}
 
 //nolint:all
+//go:noinline
+func test_string_slice(s []string) {}
+
+//nolint:all
 func ExecuteSliceFuncs() {
 	originalSlice := []int{1, 2, 3}
 	expandSlice(originalSlice)
 	sprintSlice(originalSlice)
 
+	test_string_slice([]string{"abc", "xyz", "123"})
 	test_uint_slice([]uint{1, 2, 3})
 	test_struct_slice([]structWithNoStrings{{42, true}, {24, true}})
 }

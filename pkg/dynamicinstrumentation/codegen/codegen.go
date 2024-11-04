@@ -98,8 +98,13 @@ func generateHeaderText(param ditypes.Parameter, out io.Writer) error {
 }
 
 func generateParametersTextViaLocationExpressions(params []ditypes.Parameter, out io.Writer) error {
+
 	for i := range params {
-		for _, locationExpression := range params[i].LocationExpressions {
+
+		collectedExpressions := collectLocationExpressions(&params[i])
+
+		for _, locationExpression := range collectedExpressions {
+			locationExpression.InstructionID = randomID()
 			template, err := resolveLocationExpressionTemplate(locationExpression)
 			if err != nil {
 				return err
@@ -111,6 +116,30 @@ func generateParametersTextViaLocationExpressions(params []ditypes.Parameter, ou
 		}
 	}
 	return nil
+}
+
+// collectLocationExpressions goes through the parameter tree (param.ParameterPieces) via
+// depth first traversal, collecting the LocationExpression's from each parameter and appending them
+// to a collective slice.
+func collectLocationExpressions(param *ditypes.Parameter) []ditypes.LocationExpression {
+	collectedExpressions := []ditypes.LocationExpression{}
+	queue := []*ditypes.Parameter{param}
+	var top *ditypes.Parameter
+
+	for {
+		if len(queue) == 0 {
+			break
+		}
+		top = queue[0]
+		queue = queue[1:]
+		for i := range top.ParameterPieces {
+			queue = append(queue, &top.ParameterPieces[i])
+		}
+		if len(top.LocationExpressions) > 0 {
+			collectedExpressions = append(top.LocationExpressions, collectedExpressions...)
+		}
+	}
+	return collectedExpressions
 }
 
 func resolveLocationExpressionTemplate(locationExpression ditypes.LocationExpression) (*template.Template, error) {
@@ -152,6 +181,9 @@ func resolveLocationExpressionTemplate(locationExpression ditypes.LocationExpres
 	}
 	if locationExpression.Opcode == ditypes.OpPopDynamic {
 		return template.New("pop_dynamic_location_expression").Parse(popDynamicTemplateText)
+	}
+	if locationExpression.Opcode == ditypes.OpCopy {
+		return template.New("copy_location_expression").Parse(copyTemplateText)
 	}
 	return nil, errors.New("invalid location expression opcode")
 }
