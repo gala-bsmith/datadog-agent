@@ -136,7 +136,7 @@ func craftFakeEvent(test *testIteration) *model.Event {
 	return e
 }
 
-func TestActivityTree_CreateProcessNode(t *testing.T) {
+func TestActivityTree(t *testing.T) {
 	tests := []testIteration{
 		// check process with broken lineage (parent with pid != 1 && containerID != "")
 		{
