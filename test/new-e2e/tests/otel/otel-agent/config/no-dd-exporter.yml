@@ -1,10 +1,8 @@
 receivers:
-  otlp:
-    protocols:
-      grpc:
-        endpoint: 0.0.0.0:4317
-      http:
-        endpoint: 0.0.0.0:4318
+  hostmetrics:
+    scrapers:
+      load:
+      memory:
 
 exporters:
   debug:
@@ -12,12 +10,6 @@ exporters:
 
 service:
   pipelines:
-    metrics:
-      receivers: [otlp]
-      exporters: [debug]
-    traces:
-      receivers: [otlp]
-      exporters: [debug]
-    logs:
-      receivers: [otlp]
+    metrics/sys:
+      receivers: [hostmetrics]
       exporters: [debug]
