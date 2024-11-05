@@ -54,6 +54,6 @@ func (s *noDDExporterTestSuite) TestOTelAgentInstalled() {
 	utils.TestOTelAgentInstalled(s)
 }
 
-func (s *noDDExporterTestSuite) TestFlare() {
-	utils.TestOTelFlare(s, noDDExporterProvidedConfig, noDDExporterFullConfig, sources)
+func (s *noDDExporterTestSuite) TestOTelFlareExtensionResponse() {
+	utils.TestOTelFlareExtensionResponse(s, minimalProvidedConfig, minimalFullConfig, sources)
 }
