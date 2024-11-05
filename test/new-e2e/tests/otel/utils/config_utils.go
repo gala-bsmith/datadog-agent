@@ -59,9 +59,9 @@ func TestOTelFlareExtensionResponse(s OTelTestSuite, providedCfg string, fullCfg
 	err := s.Env().FakeIntake.Client().FlushServerAndResetAggregators()
 	require.NoError(s.T(), err)
 	agent := getAgentPod(s)
-	agentJson, err := json.Marshal(agent)
+	agentJSON, err := json.Marshal(agent)
 	require.NoError(s.T(), err)
-	s.T().Log("agent pod status ", string(agentJson))
+	s.T().Log("agent pod status ", string(agentJSON))
 
 	timeout := time.Now().Add(5 * time.Minute)
 	for i := 1; time.Now().Before(timeout); i++ {
