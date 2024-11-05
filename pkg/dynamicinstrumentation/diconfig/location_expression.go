@@ -81,6 +81,10 @@ func GenerateLocationExpression(param *ditypes.Parameter) {
 					if str.Location != nil && len.Location != nil {
 						// Fields of the string are directly assigned
 						elementParam.LocationExpressions = append(elementParam.LocationExpressions,
+							// Read length to output buffer:
+							ditypes.DirectReadLocationExpression(&len),
+							ditypes.PopLocationExpression(1, 8),
+							// Read string dynamically:
 							ditypes.DirectReadLocationExpression(&str),
 							ditypes.DirectReadLocationExpression(&len),
 							ditypes.DereferenceDynamicToOutputLocationExpression(32, 1), //FIXME: use actual limit
@@ -88,6 +92,11 @@ func GenerateLocationExpression(param *ditypes.Parameter) {
 					} else {
 						// Expect address of the string struct itself on the location expression stack
 						elementParam.LocationExpressions = append(elementParam.LocationExpressions,
+							ditypes.CopyLocationExpression(),
+							// Read length to output buffer:
+							ditypes.ApplyOffsetLocationExpression(8),
+							ditypes.DereferenceToOutputLocationExpression(8),
+							// Read from actual char pointer:
 							ditypes.DereferenceLocationExpression(8),         // Put the char pointer onto the stack
 							ditypes.DereferenceToOutputLocationExpression(3), // FIXME: this hardcodes string at 3 bytes
 						)
@@ -118,8 +127,15 @@ func GenerateLocationExpression(param *ditypes.Parameter) {
 
 					if ptr.Location != nil && len.Location != nil {
 						// Fields of the slice are directly assigned
+
+						elementParam.LocationExpressions = append(elementParam.LocationExpressions,
+							// Read slice length to output buffer:
+							ditypes.DirectReadLocationExpression(&len),
+							ditypes.PopLocationExpression(1, 8),
+						)
 						for i := 0; i < 3; i++ { //FIXME: replace 3 with actual max collection length
 							elementParam.LocationExpressions = append(elementParam.LocationExpressions,
+								// Read the slice element:
 								ditypes.DirectReadLocationExpression(&ptr),
 								ditypes.ApplyOffsetLocationExpression(uint(sliceElementType.TotalSize)*uint(i)),
 							)
@@ -129,9 +145,12 @@ func GenerateLocationExpression(param *ditypes.Parameter) {
 						// Expect address on stack, use offsets accordingly
 						elementParam.LocationExpressions = append(elementParam.LocationExpressions,
 							ditypes.DereferenceLocationExpression(8), // Put the array pointer onto the stack
+							// Read the slice length to output:
+							ditypes.CopyLocationExpression(),
+							ditypes.ApplyOffsetLocationExpression(8),
+							ditypes.DereferenceToOutputLocationExpression(8),
 						)
-
-						for i := 0; i < 3; i++ { //FIXME: replace 3 with actual max collection length
+						for i := 0; i < 3; i++ { //FIXME: replace 3 with actual max collection length, add short circuit for if length is less
 							elementParam.LocationExpressions = append(elementParam.LocationExpressions,
 								ditypes.CopyLocationExpression(),
 								ditypes.ApplyOffsetLocationExpression(uint(i*(int(sliceElementType.TotalSize)))),

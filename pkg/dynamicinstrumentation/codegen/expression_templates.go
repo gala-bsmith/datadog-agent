@@ -216,5 +216,5 @@ outputOffset += collection_size_{{.InstructionID}};
 var copyTemplateText = `
 __u64 holder_{{.InstructionID}};
 bpf_map_peek_elem(&param_stack, &holder_{{.InstructionID}});
-bpf_map_push_elem(&param_stack, &holder_{{.InstructionID}});
+bpf_map_push_elem(&param_stack, &holder_{{.InstructionID}}, 0);
 `

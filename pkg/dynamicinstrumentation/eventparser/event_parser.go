@@ -10,6 +10,7 @@ package eventparser
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"reflect"
 	"unsafe"
@@ -77,7 +78,12 @@ func readParams(values []byte) []*ditypes.Param {
 			break
 		}
 
+		pretty.Log("Type definition: ", paramTypeDefinition)
+
 		sizeOfTypeDefinition := countBufferUsedByTypeDefinition(paramTypeDefinition)
+
+		fmt.Println("Size of typedef: ", sizeOfTypeDefinition)
+
 		i += sizeOfTypeDefinition
 		val, numBytesRead := parseParamValue(paramTypeDefinition, values[i:])
 		if val == nil {
@@ -116,13 +122,27 @@ func parseParamValue(definition *ditypes.Param, buffer []byte) (*ditypes.Param, 
 			tempStack.push(current.Fields[i])
 		}
 	}
+	pretty.Log("DEFINITION:", definition)
+	pretty.Log("DEF STACK: ", definitionStack)
 	var i int
 	valueStack := newParamStack()
-	for i = 0; i+3 < len(buffer); {
+	for i = 0; i+8 < len(buffer); {
 		paramDefinition := definitionStack.pop()
 		if paramDefinition == nil {
 			break
 		}
+		pretty.Log("NOW PARSING: ", paramDefinition)
+		if isRuntimeSizedType(paramDefinition.Kind) {
+			len, err := readRuntimeSizedLength(buffer[i : i+8])
+			if err != nil {
+				log.Error(err)
+				break
+			}
+			i += 8
+			paramDefinition.Size = uint16(len)
+			fmt.Println("Length:", paramDefinition.Size, paramDefinition.Kind)
+		}
+
 		if !isTypeWithHeader(paramDefinition.Kind) {
 			if i+int(paramDefinition.Size) >= len(buffer) {
 				break
@@ -187,11 +207,23 @@ func parseTypeDefinition(b []byte) *ditypes.Param {
 		if len(b) < 3 {
 			return nil
 		}
+
+		kind := b[i]
 		newParam := &ditypes.Param{
-			Kind: b[i],
-			Size: binary.LittleEndian.Uint16(b[i+1 : i+3]),
-			Type: parseKindToString(b[i]),
+			Kind: kind,
+			Type: parseKindToString(kind),
 		}
+		if reflect.Kind(kind) == reflect.Slice {
+			stack.push(newParam)
+			i += 1
+			continue
+		}
+		if reflect.Kind(kind) == reflect.String {
+			i += 1
+			goto stackCheck
+		}
+
+		newParam.Size = binary.LittleEndian.Uint16(b[i+1 : i+3])
 		if newParam.Kind == 0 && newParam.Size == 0 {
 			break
 		}
@@ -208,6 +240,7 @@ func parseTypeDefinition(b []byte) *ditypes.Param {
 		top := stack.peek()
 		top.Fields = append(top.Fields, newParam)
 		if len(top.Fields) == int(top.Size) ||
+			(reflect.Kind(top.Kind) == reflect.Slice) ||
 			(reflect.Kind(top.Kind) == reflect.Pointer && len(top.Fields) == 1) {
 			newParam = stack.pop()
 			goto stackCheck
@@ -227,7 +260,13 @@ func countBufferUsedByTypeDefinition(root *ditypes.Param) int {
 	for len(queue) != 0 {
 		front := queue[0]
 		queue = queue[1:]
-		counter += 3
+
+		if reflect.Kind(front.Kind) == reflect.String ||
+			reflect.Kind(front.Kind) == reflect.Slice {
+			counter += 1
+		} else {
+			counter += 3
+		}
 		queue = append(queue, front.Fields...)
 	}
 	return counter
@@ -235,9 +274,20 @@ func countBufferUsedByTypeDefinition(root *ditypes.Param) int {
 
 func isTypeWithHeader(pieceType byte) bool {
 	return reflect.Kind(pieceType) == reflect.Struct ||
-		reflect.Kind(pieceType) == reflect.Slice ||
 		reflect.Kind(pieceType) == reflect.Array ||
 		reflect.Kind(pieceType) == reflect.Pointer
+}
+
+func isRuntimeSizedType(pieceType byte) bool {
+	return reflect.Kind(pieceType) == reflect.Slice ||
+		reflect.Kind(pieceType) == reflect.String
+}
+
+func readRuntimeSizedLength(lengthBytes []byte) (uint64, error) {
+	if len(lengthBytes) != 8 {
+		return 0, errors.New("malformed bytes for runtime sized length")
+	}
+	return binary.NativeEndian.Uint64(lengthBytes), nil
 }
 
 func parseIndividualValue(paramType byte, paramValueBytes []byte) string {
