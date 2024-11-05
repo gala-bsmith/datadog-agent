@@ -59,12 +59,22 @@ func TestOTelFlareExtensionResponse(s OTelTestSuite, providedCfg string, fullCfg
 	err := s.Env().FakeIntake.Client().FlushServerAndResetAggregators()
 	require.NoError(s.T(), err)
 	agent := getAgentPod(s)
+	agentJson, err := json.Marshal(agent)
+	require.NoError(s.T(), err)
+	s.T().Log("agent pod status ", string(agentJson))
 
-	stdout, stderr, err := s.Env().KubernetesCluster.KubernetesClient.PodExec("datadog", agent.Name, "otel-agent", []string{"curl", "localhost:13133"})
-	s.T().Log("curl health check endpoint ", stdout, stderr, err)
+	timeout := time.Now().Add(5 * time.Minute)
+	for i := 1; time.Now().Before(timeout); i++ {
+		stdout, stderr, err := s.Env().KubernetesCluster.KubernetesClient.PodExec("datadog", agent.Name, "otel-agent", []string{"curl", "localhost:13133"})
+		s.T().Log("attempt ", i, " curl health check endpoint ", stdout, stderr, err)
+		if err == nil {
+			break
+		}
+		time.Sleep(30 * time.Second)
+	}
 
 	s.T().Log("Starting flare")
-	stdout, stderr, err = s.Env().KubernetesCluster.KubernetesClient.PodExec("datadog", agent.Name, "agent", []string{"agent", "flare", "--email", "e2e@test.com", "--send"})
+	stdout, stderr, err := s.Env().KubernetesCluster.KubernetesClient.PodExec("datadog", agent.Name, "agent", []string{"agent", "flare", "--email", "e2e@test.com", "--send"})
 	require.NoError(s.T(), err, "Failed to execute flare")
 	require.Empty(s.T(), stderr)
 	require.NotNil(s.T(), stdout)
