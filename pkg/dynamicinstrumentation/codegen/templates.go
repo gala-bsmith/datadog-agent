@@ -16,19 +16,13 @@ param_size = {{.TotalSize}};
 bpf_probe_read(&event->output[outputOffset+1], sizeof(param_size), &param_size);
 outputOffset += 3;
 `
-
-// The length and type of slices aren't known until parsing, so they require
-// special headers to read in the length dynamically
 var sliceRegisterHeaderTemplateText = `
 // Name={{.Parameter.Name}} ID={{.Parameter.ID}} TotalSize={{.Parameter.TotalSize}} Kind={{.Parameter.Kind}}
 // Write the slice kind to output buffer
 param_type = {{.Parameter.Kind}};
 bpf_probe_read(&event->output[outputOffset], sizeof(param_type), &param_type);
 
-{{.SliceLengthText}}
-
-bpf_probe_read(&event->output[outputOffset+1], sizeof(param_size), &param_size);
-outputOffset += 3;
+outputOffset += 1;
 
 __u16 indexSlice{{.Parameter.ID}};
 slice_length = param_size;
@@ -44,88 +38,32 @@ for (indexSlice{{.Parameter.ID}} = 0; indexSlice{{.Parameter.ID}} < MAX_SLICE_LE
 }
 `
 
-var sliceLengthRegisterTemplateText = `
-bpf_probe_read(&param_size, sizeof(param_size), &ctx->DWARF_REGISTER({{.Location.Register}}));
-`
-
-// The length and type of slices aren't known until parsing, so they require
-// special headers to read in the length dynamically
 var sliceStackHeaderTemplateText = `
 // Name={{.Parameter.Name}} ID={{.Parameter.ID}} TotalSize={{.Parameter.TotalSize}} Kind={{.Parameter.Kind}}
 // Write the slice kind to output buffer
 param_type = {{.Parameter.Kind}};
 bpf_probe_read(&event->output[outputOffset], sizeof(param_type), &param_type);
 
-{{.SliceLengthText}}
+outputOffset += 1;
 
-bpf_probe_read(&event->output[outputOffset+1], sizeof(param_size), &param_size);
-outputOffset += 3;
-
-__u16 indexSlice{{.Parameter.ID}};
-slice_length = param_size;
-if (slice_length > MAX_SLICE_LENGTH) {
-    slice_length = MAX_SLICE_LENGTH;
-}
-
-for (indexSlice{{.Parameter.ID}} = 0; indexSlice{{.Parameter.ID}} < MAX_SLICE_LENGTH; indexSlice{{.Parameter.ID}}++) {
-    if (indexSlice{{.Parameter.ID}} >= slice_length) {
-        break;
-    }
-    {{.SliceTypeHeaderText}}
-}
+// We put a single instance of the
+{{.SliceTypeHeaderText}}
 `
 
-var sliceLengthStackTemplateText = `
-bpf_probe_read(&param_size, sizeof(param_size), &ctx->DWARF_STACK_REGISTER+{{.Location.StackOffset}});
-`
-
-// The length of strings aren't known until parsing, so they require
-// special headers to read in the length dynamically
 var stringRegisterHeaderTemplateText = `
-// Name={{.Parameter.Name}} ID={{.Parameter.ID}} TotalSize={{.Parameter.TotalSize}} Kind={{.Parameter.Kind}}
+// Name={{.Name}} ID={{.ID}} TotalSize={{.TotalSize}} Kind={{.Kind}}
 // Write the string kind to output buffer
-param_type = {{.Parameter.Kind}};
+param_type = {{.Kind}};
 bpf_probe_read(&event->output[outputOffset], sizeof(param_type), &param_type);
-
-// Read string length and write it to output buffer
-
-{{.StringLengthText}}
-
-// Limit string length
-__u16 string_size_{{.Parameter.ID}} = param_size;
-if (string_size_{{.Parameter.ID}} > MAX_STRING_SIZE) {
-    string_size_{{.Parameter.ID}} = MAX_STRING_SIZE;
-}
-bpf_probe_read(&event->output[outputOffset+1], sizeof(string_size_{{.Parameter.ID}}), &string_size_{{.Parameter.ID}});
-outputOffset += 3;
+outputOffset += 1;
 `
 
-var stringLengthRegisterTemplateText = `
-bpf_probe_read(&param_size, sizeof(param_size), &ctx->DWARF_REGISTER({{.Location.Register}}));
-`
-
-// The length of strings aren't known until parsing, so they require
-// special headers to read in the length dynamically
 var stringStackHeaderTemplateText = `
-// Name={{.Parameter.Name}} ID={{.Parameter.ID}} TotalSize={{.Parameter.TotalSize}} Kind={{.Parameter.Kind}}
+// Name={{.Name}} ID={{.ID}} TotalSize={{.TotalSize}} Kind={{.Kind}}
 // Write the string kind to output buffer
-param_type = {{.Parameter.Kind}};
+param_type = {{.Kind}};
 bpf_probe_read(&event->output[outputOffset], sizeof(param_type), &param_type);
-
-// Read string length and write it to output buffer
-{{.StringLengthText}}
-
-// Limit string length
-__u16 string_size_{{.Parameter.ID}} = param_size;
-if (string_size_{{.Parameter.ID}} > MAX_STRING_SIZE) {
-    string_size_{{.Parameter.ID}} = MAX_STRING_SIZE;
-}
-bpf_probe_read(&event->output[outputOffset+1], sizeof(string_size_{{.Parameter.ID}}), &string_size_{{.Parameter.ID}});
-outputOffset += 3;
-`
-
-var stringLengthStackTemplateText = `
-bpf_probe_read(&param_size, sizeof(param_size), &ctx->DWARF_STACK_REGISTER+{{.Location.StackOffset}});
+outputOffset += 1;
 `
 
 // Unsupported types just get a single `255` value to signify as a placeholder

@@ -19,6 +19,7 @@ import (
 
 	"github.com/DataDog/datadog-agent/pkg/dynamicinstrumentation/ditypes"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
+	"github.com/kr/pretty"
 )
 
 // GenerateBPFParamsCode generates the source code associated with the probe and data
@@ -31,6 +32,7 @@ func GenerateBPFParamsCode(procInfo *ditypes.ProcessInfo, probe *ditypes.Probe) 
 		params := applyCaptureDepth(procInfo.TypeMap.Functions[probe.FuncName], probe.InstrumentationInfo.InstrumentationOptions.MaxReferenceDepth)
 		for i := range params {
 			flattenedParams := flattenParameters([]ditypes.Parameter{params[i]})
+			pretty.Log("FlattenedParams: ", flattenedParams)
 			err := generateHeadersText(flattenedParams, out)
 			if err != nil {
 				return err
@@ -202,14 +204,13 @@ func generateSliceHeader(slice *ditypes.Parameter, out io.Writer) error {
 
 	typeHeaderBytes := []byte{}
 	typeHeaderBuf := bytes.NewBuffer(typeHeaderBytes)
-	err := generateHeaderText(slice.ParameterPieces[0], typeHeaderBuf)
-	if err != nil {
-		return err
-	}
 
-	lengthHeaderBytes := []byte{}
-	lengthHeaderBuf := bytes.NewBuffer(lengthHeaderBytes)
-	err = generateSliceLengthHeader(slice.ParameterPieces[1], lengthHeaderBuf)
+	// Slices are defined with an "array" pointer as piece 0, which is a pointer to the actual
+	// type, which is defined as piece 0 under that.
+	if len(slice.ParameterPieces) != 3 && len(slice.ParameterPieces[0].ParameterPieces) != 1 {
+		return errors.New("malformed slice type")
+	}
+	err := generateHeaderText(slice.ParameterPieces[0].ParameterPieces[0], typeHeaderBuf)
 	if err != nil {
 		return err
 	}
@@ -217,7 +218,6 @@ func generateSliceHeader(slice *ditypes.Parameter, out io.Writer) error {
 	w := sliceHeaderWrapper{
 		Parameter:           slice,
 		SliceTypeHeaderText: typeHeaderBuf.String(),
-		SliceLengthText:     lengthHeaderBuf.String(),
 	}
 
 	sliceTemplate, err := resolveHeaderTemplate(slice)
@@ -240,78 +240,18 @@ func generateStringHeader(stringParam *ditypes.Parameter, out io.Writer) error {
 	if len(stringParam.ParameterPieces) != 2 {
 		return fmt.Errorf("invalid string parameter when generating header code (pieces len %d)", len(stringParam.ParameterPieces))
 	}
-
-	x := []byte{}
-	buf := bytes.NewBuffer(x)
-	err := generateStringLengthHeader(stringParam.ParameterPieces[1], buf)
-	if err != nil {
-		return err
-	}
-
-	stringHeaderWrapper := stringHeaderWrapper{
-		Parameter:        stringParam,
-		StringLengthText: buf.String(),
-	}
-
 	stringTemplate, err := resolveHeaderTemplate(stringParam)
 	if err != nil {
 		return err
 	}
-
-	err = stringTemplate.Execute(out, stringHeaderWrapper)
+	err = stringTemplate.Execute(out, stringParam)
 	if err != nil {
 		return fmt.Errorf("could not execute template for generating string header: %w", err)
 	}
 	return nil
 }
 
-func generateStringLengthHeader(stringLengthParamPiece ditypes.Parameter, buf *bytes.Buffer) error {
-	var (
-		tmplte *template.Template
-		err    error
-	)
-	if stringLengthParamPiece.Location == nil {
-		stringLengthParamPiece.Location = &ditypes.Location{}
-	}
-	if stringLengthParamPiece.Location.InReg {
-		tmplte, err = template.New("string_register_length_header").Parse(stringLengthRegisterTemplateText)
-	} else {
-		tmplte, err = template.New("string_stack_length_header").Parse(stringLengthStackTemplateText)
-	}
-
-	if err != nil {
-		return err
-	}
-	return tmplte.Execute(buf, stringLengthParamPiece)
-}
-
-func generateSliceLengthHeader(sliceLengthParamPiece ditypes.Parameter, buf *bytes.Buffer) error {
-	var (
-		tmplte *template.Template
-		err    error
-	)
-
-	if sliceLengthParamPiece.Location == nil {
-		sliceLengthParamPiece.Location = &ditypes.Location{}
-	}
-	if sliceLengthParamPiece.Location.InReg {
-		tmplte, err = template.New("slice_register_length_header").Parse(sliceLengthRegisterTemplateText)
-	} else {
-		tmplte, err = template.New("slice_stack_length_header").Parse(sliceLengthStackTemplateText)
-	}
-	if err != nil {
-		return err
-	}
-	return tmplte.Execute(buf, sliceLengthParamPiece)
-}
-
 type sliceHeaderWrapper struct {
 	Parameter           *ditypes.Parameter
-	SliceLengthText     string
 	SliceTypeHeaderText string
-}
-
-type stringHeaderWrapper struct {
-	Parameter        *ditypes.Parameter
-	StringLengthText string
 }
