@@ -60,15 +60,6 @@ func GenerateLocationExpression(param *ditypes.Parameter) {
 					elementParam.LocationExpressions = append(elementParam.LocationExpressions,
 						ditypes.DirectReadLocationExpression(elementParam),
 					)
-					if len(elementParam.ParameterPieces) > 0 &&
-						(elementParam.ParameterPieces[0].Kind == uint(reflect.String) ||
-							elementParam.ParameterPieces[0].Kind == uint(reflect.Slice)) {
-						// In the special case of pointers to strings and slices, we need the address pushed twice
-						// to the stack for the sake of parsing both relevant fields (len/ptr).
-						elementParam.LocationExpressions = append(elementParam.LocationExpressions,
-							ditypes.DirectReadLocationExpression(elementParam),
-						)
-					}
 				} else if elementParam.Kind == uint(reflect.Struct) {
 					// Structs don't provide context on location, or have values themselves
 					continue
@@ -83,7 +74,7 @@ func GenerateLocationExpression(param *ditypes.Parameter) {
 						elementParam.LocationExpressions = append(elementParam.LocationExpressions,
 							// Read length to output buffer:
 							ditypes.DirectReadLocationExpression(&len),
-							ditypes.PopLocationExpression(1, 8),
+							ditypes.PopLocationExpression(1, 2),
 							// Read string dynamically:
 							ditypes.DirectReadLocationExpression(&str),
 							ditypes.DirectReadLocationExpression(&len),
@@ -95,7 +86,7 @@ func GenerateLocationExpression(param *ditypes.Parameter) {
 							ditypes.CopyLocationExpression(),
 							// Read length to output buffer:
 							ditypes.ApplyOffsetLocationExpression(8),
-							ditypes.DereferenceToOutputLocationExpression(8),
+							ditypes.DereferenceToOutputLocationExpression(2),
 							// Read from actual char pointer:
 							ditypes.DereferenceLocationExpression(8),         // Put the char pointer onto the stack
 							ditypes.DereferenceToOutputLocationExpression(3), // FIXME: this hardcodes string at 3 bytes
@@ -127,11 +118,11 @@ func GenerateLocationExpression(param *ditypes.Parameter) {
 
 					if ptr.Location != nil && len.Location != nil {
 						// Fields of the slice are directly assigned
-
+						len.TotalSize = 2
 						elementParam.LocationExpressions = append(elementParam.LocationExpressions,
 							// Read slice length to output buffer:
 							ditypes.DirectReadLocationExpression(&len),
-							ditypes.PopLocationExpression(1, 8),
+							ditypes.PopLocationExpression(1, 2),
 						)
 						for i := 0; i < 3; i++ { //FIXME: replace 3 with actual max collection length
 							elementParam.LocationExpressions = append(elementParam.LocationExpressions,

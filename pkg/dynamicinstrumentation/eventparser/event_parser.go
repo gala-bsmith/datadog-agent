@@ -53,7 +53,7 @@ func ParseEvent(record []byte, ratelimiters *ratelimiter.MultiProbeRateLimiter) 
 	event.UID = baseEvent.Uid
 	event.StackPCs = baseEvent.Program_counters[:]
 	event.Argdata = readParams(record[ditypes.SizeofBaseEvent:])
-	pretty.Log(event.Argdata)
+	pretty.Log("Event:", event.Argdata)
 
 	return &event
 }
@@ -70,35 +70,26 @@ func readParams(values []byte) []*ditypes.Param {
 	fmt.Println(values[0:100])
 	outputParams := []*ditypes.Param{}
 	for i := 0; i < MaxBufferSize; {
+		fmt.Println("Enter read param loop")
 		if i+3 >= len(values) {
+			fmt.Println("Exceeded buffer!")
+
 			break
 		}
 		paramTypeDefinition := parseTypeDefinition(values[i:])
 		if paramTypeDefinition == nil {
+			fmt.Println("Def is nil!")
 			break
 		}
-
-		pretty.Log("Type definition: ", paramTypeDefinition)
-
 		sizeOfTypeDefinition := countBufferUsedByTypeDefinition(paramTypeDefinition)
-
-		fmt.Println("Size of typedef: ", sizeOfTypeDefinition)
-
 		i += sizeOfTypeDefinition
 		val, numBytesRead := parseParamValue(paramTypeDefinition, values[i:])
 		if val == nil {
+			fmt.Println("Val is nil!")
 			return outputParams
 		}
-		if reflect.Kind(val.Kind) == reflect.Slice {
-			// In BPF we read the slice by reading the maximum size of a slice
-			// that we allow, instead of just the size of the slice (which we
-			// know at runtime). This is to satisfy the verifier. When parsing
-			// here, we read just the actual slice content, but have to move the
-			// buffer index ahead by the amount of space used by the max read.
-			i += ditypes.SliceMaxSize
-		} else {
-			i += numBytesRead
-		}
+
+		i += numBytesRead
 		outputParams = append(outputParams, val)
 	}
 	return outputParams
@@ -109,58 +100,98 @@ func readParams(values []byte) []*ditypes.Param {
 // from the byte buffer. It returns the resulting parameter and an indication of
 // how many bytes were read from the buffer
 func parseParamValue(definition *ditypes.Param, buffer []byte) (*ditypes.Param, int) {
+	pretty.Log("ENTERING PARSE PARAM VALUE: ", definition)
+	var bufferIndex int = 0
+
 	// Start by creating a stack with each layer of the definition
 	// which will correspond with the layers of the values read from buffer.
-	// This is done using a temporary stack.
+	// This is done using a temporary stack to reverse the order.
 	tempStack := newParamStack()
 	definitionStack := newParamStack()
 	tempStack.push(definition)
 	for !tempStack.isEmpty() {
 		current := tempStack.pop()
-		definitionStack.push(copyParam(current))
-		for i := 0; i < len(current.Fields); i++ {
-			tempStack.push(current.Fields[i])
+
+		pretty.Log("Current: ", current)
+
+		if reflect.Kind(current.Kind) == reflect.Slice {
+			len, err := readRuntimeSizedLength(buffer[bufferIndex : bufferIndex+2])
+			if err != nil {
+				log.Error(err)
+			}
+			fmt.Println("LEN:", len)
+			bufferIndex += 2
+			//TODO: Limit `len` to max slice elements
+			current.Size = len
+			if len == 0 {
+				current.Fields = []*ditypes.Param{}
+				_ = definitionStack.pop()
+			} else if len > 1 {
+				fmt.Println("Ok, going to set things up")
+				for i := 0; i < int(len)-1; i++ {
+					copiedSliceElementDefinition := &ditypes.Param{}
+					deepCopyParam(copiedSliceElementDefinition, current.Fields[0])
+					pretty.Log("Here's the deep copy: ", copiedSliceElementDefinition)
+					current.Fields = append(current.Fields, copiedSliceElementDefinition)
+				}
+			}
+			pretty.Log("Definition stack: ", definitionStack)
+		} else {
+			fmt.Println("Not a slice")
+		}
+
+		copiedParam := copyParam(current)
+		definitionStack.push(copiedParam)
+		for n := 0; n < len(current.Fields); n++ {
+			tempStack.push(current.Fields[n])
 		}
 	}
-	pretty.Log("DEFINITION:", definition)
-	pretty.Log("DEF STACK: ", definitionStack)
-	var i int
+
+	pretty.Log("At the end of this, here's the definition stack: ", definitionStack)
+	fmt.Println("Moving on to parsing the actual values")
+
 	valueStack := newParamStack()
-	for i = 0; i+8 < len(buffer); {
+	for bufferIndex+8 < len(buffer) {
 		paramDefinition := definitionStack.pop()
 		if paramDefinition == nil {
+			fmt.Println("Param definition is nil!!!")
 			break
+		} else {
+			pretty.Log("ParamDefinition that we're parsing:", paramDefinition)
 		}
-		pretty.Log("NOW PARSING: ", paramDefinition)
-		if isRuntimeSizedType(paramDefinition.Kind) {
-			len, err := readRuntimeSizedLength(buffer[i : i+8])
+
+		if reflect.Kind(paramDefinition.Kind) == reflect.String {
+			// We read the length first
+			size, err := readRuntimeSizedLength(buffer[bufferIndex : bufferIndex+2])
 			if err != nil {
 				log.Error(err)
 				break
 			}
-			i += 8
-			paramDefinition.Size = uint16(len)
-			fmt.Println("Length:", paramDefinition.Size, paramDefinition.Kind)
-		}
-
-		if !isTypeWithHeader(paramDefinition.Kind) {
-			if i+int(paramDefinition.Size) >= len(buffer) {
+			bufferIndex += 2
+			fmt.Println("SIZE: ", size)
+			paramDefinition.Size = size
+			paramDefinition.ValueStr = string(buffer[bufferIndex : bufferIndex+int(size)])
+			fmt.Println(paramDefinition.ValueStr)
+			bufferIndex += int(size) // FIXME: Needs to be max value, not variable size
+			valueStack.push(paramDefinition)
+		} else if !isTypeWithHeader(paramDefinition.Kind) {
+			if bufferIndex+int(paramDefinition.Size) >= len(buffer) {
 				break
 			}
 			// This is a regular value (no sub-fields).
 			// We parse the value of it from the buffer and push it to the value stack
-			paramDefinition.ValueStr = parseIndividualValue(paramDefinition.Kind, buffer[i:i+int(paramDefinition.Size)])
-			i += int(paramDefinition.Size)
+			paramDefinition.ValueStr = parseIndividualValue(paramDefinition.Kind, buffer[bufferIndex:bufferIndex+int(paramDefinition.Size)])
+			bufferIndex += int(paramDefinition.Size)
 			valueStack.push(paramDefinition)
 		} else if reflect.Kind(paramDefinition.Kind) == reflect.Pointer {
-			if i+int(paramDefinition.Size) >= len(buffer) {
+			if bufferIndex+int(paramDefinition.Size) >= len(buffer) {
 				break
 			}
 			// Pointers are unique in that they have their own value, and sub-fields.
 			// We parse the value of it from the buffer, place it in the value for
 			// the pointer itself, then pop the next value and place it as a sub-field.
-			paramDefinition.ValueStr = parseIndividualValue(paramDefinition.Kind, buffer[i:i+int(paramDefinition.Size)])
-			i += int(paramDefinition.Size)
+			paramDefinition.ValueStr = parseIndividualValue(paramDefinition.Kind, buffer[bufferIndex:bufferIndex+int(paramDefinition.Size)])
+			bufferIndex += int(paramDefinition.Size)
 			paramDefinition.Fields = append(paramDefinition.Fields, valueStack.pop())
 			valueStack.push(paramDefinition)
 		} else {
@@ -175,7 +206,18 @@ func parseParamValue(definition *ditypes.Param, buffer []byte) (*ditypes.Param, 
 			valueStack.push(paramDefinition)
 		}
 	}
-	return valueStack.pop(), i
+	return valueStack.pop(), bufferIndex
+}
+
+func deepCopyParam(dst, src *ditypes.Param) {
+	dst.Type = src.Type
+	dst.Kind = src.Kind
+	dst.Size = src.Size
+	dst.Fields = make([]*ditypes.Param, len(src.Fields))
+	for i, field := range src.Fields {
+		dst.Fields[i] = &ditypes.Param{}
+		deepCopyParam(dst.Fields[i], field)
+	}
 }
 
 func copyParam(p *ditypes.Param) *ditypes.Param {
@@ -275,6 +317,7 @@ func countBufferUsedByTypeDefinition(root *ditypes.Param) int {
 func isTypeWithHeader(pieceType byte) bool {
 	return reflect.Kind(pieceType) == reflect.Struct ||
 		reflect.Kind(pieceType) == reflect.Array ||
+		reflect.Kind(pieceType) == reflect.Slice ||
 		reflect.Kind(pieceType) == reflect.Pointer
 }
 
@@ -283,11 +326,11 @@ func isRuntimeSizedType(pieceType byte) bool {
 		reflect.Kind(pieceType) == reflect.String
 }
 
-func readRuntimeSizedLength(lengthBytes []byte) (uint64, error) {
-	if len(lengthBytes) != 8 {
+func readRuntimeSizedLength(lengthBytes []byte) (uint16, error) {
+	if len(lengthBytes) != 2 {
 		return 0, errors.New("malformed bytes for runtime sized length")
 	}
-	return binary.NativeEndian.Uint64(lengthBytes), nil
+	return binary.NativeEndian.Uint16(lengthBytes), nil
 }
 
 func parseIndividualValue(paramType byte, paramValueBytes []byte) string {

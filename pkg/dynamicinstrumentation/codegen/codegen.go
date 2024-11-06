@@ -19,7 +19,6 @@ import (
 
 	"github.com/DataDog/datadog-agent/pkg/dynamicinstrumentation/ditypes"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
-	"github.com/kr/pretty"
 )
 
 // GenerateBPFParamsCode generates the source code associated with the probe and data
@@ -32,7 +31,6 @@ func GenerateBPFParamsCode(procInfo *ditypes.ProcessInfo, probe *ditypes.Probe) 
 		params := applyCaptureDepth(procInfo.TypeMap.Functions[probe.FuncName], probe.InstrumentationInfo.InstrumentationOptions.MaxReferenceDepth)
 		for i := range params {
 			flattenedParams := flattenParameters([]ditypes.Parameter{params[i]})
-			pretty.Log("FlattenedParams: ", flattenedParams)
 			err := generateHeadersText(flattenedParams, out)
 			if err != nil {
 				return err

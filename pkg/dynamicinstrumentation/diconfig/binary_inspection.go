@@ -16,7 +16,6 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/network/go/bininspect"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
 	"github.com/DataDog/datadog-agent/pkg/util/safeelf"
-	"github.com/kr/pretty"
 )
 
 // inspectGoBinaries goes through each service and populates information about the binary
@@ -137,8 +136,6 @@ func populateLocationExpressions(
 		if !ok {
 			return fmt.Errorf("no function metadata for function %s", funcName)
 		}
-
-		pretty.Log(">>: ", funcMetadata, parameters)
 
 		for i := range parameters {
 			if i >= len(funcMetadata.Parameters) {
