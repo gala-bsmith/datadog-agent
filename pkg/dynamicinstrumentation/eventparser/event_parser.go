@@ -70,22 +70,17 @@ func readParams(values []byte) []*ditypes.Param {
 	fmt.Println(values[0:100])
 	outputParams := []*ditypes.Param{}
 	for i := 0; i < MaxBufferSize; {
-		fmt.Println("Enter read param loop")
 		if i+3 >= len(values) {
-			fmt.Println("Exceeded buffer!")
-
 			break
 		}
 		paramTypeDefinition := parseTypeDefinition(values[i:])
 		if paramTypeDefinition == nil {
-			fmt.Println("Def is nil!")
 			break
 		}
 		sizeOfTypeDefinition := countBufferUsedByTypeDefinition(paramTypeDefinition)
 		i += sizeOfTypeDefinition
 		val, numBytesRead := parseParamValue(paramTypeDefinition, values[i:])
 		if val == nil {
-			fmt.Println("Val is nil!")
 			return outputParams
 		}
 
@@ -100,7 +95,6 @@ func readParams(values []byte) []*ditypes.Param {
 // from the byte buffer. It returns the resulting parameter and an indication of
 // how many bytes were read from the buffer
 func parseParamValue(definition *ditypes.Param, buffer []byte) (*ditypes.Param, int) {
-	pretty.Log("ENTERING PARSE PARAM VALUE: ", definition)
 	var bufferIndex int = 0
 
 	// Start by creating a stack with each layer of the definition
@@ -112,14 +106,11 @@ func parseParamValue(definition *ditypes.Param, buffer []byte) (*ditypes.Param, 
 	for !tempStack.isEmpty() {
 		current := tempStack.pop()
 
-		pretty.Log("Current: ", current)
-
 		if reflect.Kind(current.Kind) == reflect.Slice {
 			len, err := readRuntimeSizedLength(buffer[bufferIndex : bufferIndex+2])
 			if err != nil {
 				log.Error(err)
 			}
-			fmt.Println("LEN:", len)
 			bufferIndex += 2
 			//TODO: Limit `len` to max slice elements
 			current.Size = len
@@ -127,19 +118,13 @@ func parseParamValue(definition *ditypes.Param, buffer []byte) (*ditypes.Param, 
 				current.Fields = []*ditypes.Param{}
 				_ = definitionStack.pop()
 			} else if len > 1 {
-				fmt.Println("Ok, going to set things up")
 				for i := 0; i < int(len)-1; i++ {
 					copiedSliceElementDefinition := &ditypes.Param{}
 					deepCopyParam(copiedSliceElementDefinition, current.Fields[0])
-					pretty.Log("Here's the deep copy: ", copiedSliceElementDefinition)
 					current.Fields = append(current.Fields, copiedSliceElementDefinition)
 				}
 			}
-			pretty.Log("Definition stack: ", definitionStack)
-		} else {
-			fmt.Println("Not a slice")
 		}
-
 		copiedParam := copyParam(current)
 		definitionStack.push(copiedParam)
 		for n := 0; n < len(current.Fields); n++ {
@@ -147,17 +132,11 @@ func parseParamValue(definition *ditypes.Param, buffer []byte) (*ditypes.Param, 
 		}
 	}
 
-	pretty.Log("At the end of this, here's the definition stack: ", definitionStack)
-	fmt.Println("Moving on to parsing the actual values")
-
 	valueStack := newParamStack()
 	for bufferIndex+8 < len(buffer) {
 		paramDefinition := definitionStack.pop()
 		if paramDefinition == nil {
-			fmt.Println("Param definition is nil!!!")
 			break
-		} else {
-			pretty.Log("ParamDefinition that we're parsing:", paramDefinition)
 		}
 
 		if reflect.Kind(paramDefinition.Kind) == reflect.String {
@@ -168,11 +147,9 @@ func parseParamValue(definition *ditypes.Param, buffer []byte) (*ditypes.Param, 
 				break
 			}
 			bufferIndex += 2
-			fmt.Println("SIZE: ", size)
 			paramDefinition.Size = size
 			paramDefinition.ValueStr = string(buffer[bufferIndex : bufferIndex+int(size)])
-			fmt.Println(paramDefinition.ValueStr)
-			bufferIndex += int(size) // FIXME: Needs to be max value, not variable size
+			bufferIndex += int(ditypes.StringMaxSize) // FIXME: Needs to be max value, not variable size
 			valueStack.push(paramDefinition)
 		} else if !isTypeWithHeader(paramDefinition.Kind) {
 			if bufferIndex+int(paramDefinition.Size) >= len(buffer) {

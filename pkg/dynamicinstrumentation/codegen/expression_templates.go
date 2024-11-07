@@ -57,7 +57,7 @@ __u64 valueHolder_{{.InstructionID}};
 for(i = 0; i < {{.Arg1}}; i++) {
     bpf_map_pop_elem(&param_stack, &valueHolder_{{.InstructionID}});
     bpf_printk("\t%d", valueHolder_{{.InstructionID}});
-    bpf_probe_read(&event->output[outputOffset+i], 8, &valueHolder_{{.InstructionID}});
+    bpf_probe_read(&event->output[outputOffset+i], {{.Arg2}}, &valueHolder_{{.InstructionID}});
     outputOffset += {{.Arg2}};
 }
 `
