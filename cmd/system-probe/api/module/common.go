@@ -9,6 +9,7 @@ package module
 import (
 	"errors"
 
+	"github.com/DataDog/datadog-agent/comp/core/tagger"
 	"github.com/DataDog/datadog-agent/comp/core/telemetry"
 	workloadmeta "github.com/DataDog/datadog-agent/comp/core/workloadmeta/def"
 	"go.uber.org/fx"
@@ -31,4 +32,5 @@ type FactoryDependencies struct {
 
 	WMeta     workloadmeta.Component
 	Telemetry telemetry.Component
+	Tagger    tagger.Component
 }
