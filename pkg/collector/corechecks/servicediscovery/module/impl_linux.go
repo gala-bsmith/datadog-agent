@@ -351,7 +351,6 @@ func (s *discovery) getServiceInfo(proc *process.Process) (*serviceInfo, error) 
 	if lang == "" {
 		lang = language.FindUsingPrivilegedDetector(s.privilegedDetector, proc.Pid)
 	}
-
 	env, err := getTargetEnvs(proc)
 	if err != nil {
 		return nil, err

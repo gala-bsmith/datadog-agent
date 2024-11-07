@@ -8,8 +8,9 @@ package servicediscovery
 import (
 	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/servicediscovery/model"
 	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/servicediscovery/servicetype"
-	pkgconfigsetup "github.com/DataDog/datadog-agent/pkg/config/setup"
+	//pkgconfigsetup "github.com/DataDog/datadog-agent/pkg/config/setup"
 	processNet "github.com/DataDog/datadog-agent/pkg/process/net"
+	proccontainers "github.com/DataDog/datadog-agent/pkg/process/util/containers"
 )
 
 //go:generate mockgen -source=$GOFILE -package=$GOPACKAGE -destination=impl_linux_mock.go
@@ -22,18 +23,20 @@ type windowsImpl struct {
 	getSysProbeClient func() (systemProbeClient, error)
 	time              timer
 
-	ignoreCfg map[string]bool
+	ignoreCfg         map[string]bool
+	containerProvider proccontainers.ContainerProvider
 
 	ignoreProcs       map[int]bool
 	aliveServices     map[int]*serviceInfo
 	potentialServices map[int]*serviceInfo
 }
 
-func newWindowsImpl(ignoreCfg map[string]bool) (osImpl, error) {
+func newWindowsImpl(ignoreCfg map[string]bool, containerProvider proccontainers.ContainerProvider) (osImpl, error) {
 	return &windowsImpl{
 		getSysProbeClient: getSysProbeClient,
 		time:              realTime{},
 		ignoreCfg:         ignoreCfg,
+		containerProvider: containerProvider,
 		ignoreProcs:       make(map[int]bool),
 		aliveServices:     make(map[int]*serviceInfo),
 		potentialServices: make(map[int]*serviceInfo),
@@ -163,7 +166,6 @@ type systemProbeClient interface {
 }
 
 func getSysProbeClient() (systemProbeClient, error) {
-	return processNet.GetRemoteSystemProbeUtil(
-		pkgconfigsetup.SystemProbe().GetString(""),
-	)
+	// Windows system probe uses a static named pipe and not a socket.
+	return processNet.GetRemoteSystemProbeUtil("")
 }

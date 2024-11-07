@@ -20,18 +20,16 @@ import (
 	"github.com/DataDog/datadog-agent/cmd/system-probe/utils"
 
 	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/servicediscovery"
-	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/servicediscovery/language"
-
 	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/servicediscovery/apm"
-	//"github.com/DataDog/datadog-agent/pkg/collector/corechecks/servicediscovery/language"
+	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/servicediscovery/envs"
+	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/servicediscovery/language"
 
 	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/servicediscovery/model"
 	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/servicediscovery/usm"
 
-	//"github.com/DataDog/datadog-agent/pkg/languagedetection/privileged"
 	"github.com/DataDog/datadog-agent/pkg/process/procutil"
-	//"github.com/DataDog/datadog-agent/pkg/util/kernel"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
+	"github.com/DataDog/datadog-agent/pkg/util/winutil/iphelper"
 )
 
 const (
@@ -49,13 +47,14 @@ type serviceInfo struct {
 	language           language.Language
 	apmInstrumentation apm.Instrumentation
 	cmdLine            []string
-	startTimeSecs      uint64
+	startTimeMillis    uint64
 	lastCPUUsage       float64
 }
 
 type resourceInfo struct {
 	cpuUsage float64
 	rss      uint64
+	ports    []uint16
 }
 
 // discovery is an implementation of the Module interface for the discovery module.
@@ -141,12 +140,25 @@ func (s *discovery) getServices() (*[]model.Service, error) {
 	newServiceInfos := make(map[int32]*serviceInfo, len(pids))
 	var services []model.Service
 
+	// Query all opened TCP ports.
+	tcpTable, err := iphelper.GetExtendedTcpV4Table()
+	if err != nil {
+		return nil, err
+	}
+
 	for _, pid := range pids {
-		// Query static process information and a snapshot of resource usage.
-		serviceInfo, resInfo, err := s.queryServiceInfo(pid)
+		// Query static process information. This may be cached.
+		serviceInfo, err := s.getServiceInfo(pid)
 		if err != nil {
 			continue
 		}
+
+		// Query resource usage by the process at this time.
+		resInfo, err := queryResourceInfo(pid, tcpTable)
+		if err != nil {
+			continue
+		}
+
 		newServiceInfos[pid] = serviceInfo
 
 		// Compile a snapshot to report to the cloud.
@@ -169,23 +181,17 @@ func (s *discovery) getServices() (*[]model.Service, error) {
 	return &services, nil
 }
 
-func (s *discovery) queryServiceInfo(pid int32) (*serviceInfo, *resourceInfo, error) {
+func (s *discovery) getServiceInfo(pid int32) (*serviceInfo, error) {
 	// This also fetches createTime with Win32 GetProcessTimes
 	proc, err := process.NewProcess(pid)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// Check if the process was previously detected.
 	cachedInfo, ok := s.getCachedInfo(proc)
 	if ok {
-		// Query a new snapshot of resource usage by the process.
-		resInfo, err := queryResourceInfo(proc)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		return cachedInfo, resInfo, nil
+		return cachedInfo, nil
 	}
 
 	// Fetch createTime from the process. This should already be cached.
@@ -205,36 +211,37 @@ func (s *discovery) queryServiceInfo(pid int32) (*serviceInfo, *resourceInfo, er
 	// extract the command line from the PEB.
 	cmdline, err := proc.CmdlineSlice()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	cmdline, _ = s.scrubber.ScrubCommand(cmdline)
 
 	// This calls Win32 QueryFullProcessImageName
 	exe, err := proc.Exe()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	envVars, err := getEnvironmentVariables(proc)
+	envVars, err := getEnvVars(proc)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-
-	// Query a snapshot of of resource usage.
-	resInfo, err := queryResourceInfo(proc)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Try to detect the runtime language of process.
-	lang := language.FindInArgs(exe, cmdline)
 
 	// rootDir has no effect for GetServiceName since USM has only Linux executable detectors.
 	rootDir := filepath.Dir(exe)
 
 	contextMap := make(usm.DetectorContextMap)
-	nameMeta := servicediscovery.GetServiceName(cmdline, envVars, rootDir, lang, contextMap)
-	apmInstrumentation := apm.Detect(proc.Pid, cmdline, envVars, lang, contextMap)
+	contextMap[usm.ServiceProc] = proc
+
+	fs := usm.NewSubDirFS(rootDir)
+	ctx := usm.NewDetectionContext(cmdline, envVars, fs)
+	ctx.Pid = int(proc.Pid)
+	ctx.ContextMap = contextMap
+
+	// Try to detect the runtime language of process.
+	lang := language.FindInArgs(exe, cmdline)
+
+	nameMeta := servicediscovery.GetServiceName(lang, ctx)
+	apmInstrumentation := apm.Detect(lang, ctx)
 
 	// This is static process information
 	return &serviceInfo{
@@ -244,24 +251,35 @@ func (s *discovery) queryServiceInfo(pid int32) (*serviceInfo, *resourceInfo, er
 			apmInstrumentation: apmInstrumentation,
 			language:           lang,
 			cmdLine:            cmdline,
-			startTimeSecs:      uint64(createTimeMs / 1000),
+			startTimeMillis:    uint64(createTimeMs),
 		},
-		resInfo,
 		nil
 }
 
 // queryResourceInfo queries for CPU usage and working set of the given process.
-func queryResourceInfo(proc *process.Process) (*resourceInfo, error) {
-	// This calls Win32 GetProcessMemoryInfo
+func queryResourceInfo(pid int32, tcpTable map[uint32][]iphelper.MIB_TCPROW_OWNER_PID) (*resourceInfo, error) {
+	// We do not call process.NewProcess because it does a few expensive checks that we don't need.
+	proc := &process.Process{
+		Pid: pid,
+	}
+
+	// This calls Win32 GetProcessMemoryInfo with the working set.
 	memInfo, err := proc.MemoryInfo()
 	if err != nil {
 		return nil, err
 	}
 
-	// This calls Win32 GetProcessTimes
+	// This calls Win32 GetProcessTimes with CPU usage.
 	cpuTimes, err := proc.Times()
 	if err != nil {
 		return nil, err
+	}
+
+	// Find the reserved TCP ports by this PID.
+	var ports []uint16
+	var entries = tcpTable[uint32(pid)]
+	for _, entry := range entries {
+		ports = append(ports, uint16(entry.DwLocalPort))
 	}
 
 	return &resourceInfo{
@@ -270,6 +288,8 @@ func queryResourceInfo(proc *process.Process) (*resourceInfo, error) {
 
 		// RSS is the same as the working set.
 		rss: memInfo.RSS,
+
+		ports: ports,
 	}, nil
 }
 
@@ -282,7 +302,7 @@ func (s *discovery) buildServiceSnapshot(pid int32, serviceInfo *serviceInfo, re
 
 	// Compute average CPU core usage.
 	procCPUUsageDelta := resInfo.cpuUsage - serviceInfo.lastCPUUsage
-	avgCCores := (procCPUUsageDelta / systemCPUsageDelta) * float64(runtime.NumCPU())
+	avgCPUCores := (procCPUUsageDelta / systemCPUsageDelta) * float64(runtime.NumCPU())
 
 	return &model.Service{
 		// Static information
@@ -294,13 +314,12 @@ func (s *discovery) buildServiceSnapshot(pid int32, serviceInfo *serviceInfo, re
 		APMInstrumentation: string(serviceInfo.apmInstrumentation),
 		Language:           string(serviceInfo.language),
 		CommandLine:        serviceInfo.cmdLine,
-		StartTimeSecs:      serviceInfo.startTimeSecs,
+		StartTimeMilli:     serviceInfo.startTimeMillis,
 
 		// Resource information
 		RSS:      resInfo.rss,
-		CPUCores: avgCpuCores,
-
-		//Ports:              ports,
+		CPUCores: avgCPUCores,
+		Ports:    resInfo.ports,
 	}, nil
 }
 
@@ -312,7 +331,7 @@ func (s *discovery) getCachedInfo(proc *process.Process) (*serviceInfo, bool) {
 	if ok {
 		// PIDs can be randomly reused. Check if this process matches the same start time.
 		createTimeMs, err := proc.CreateTime()
-		if err != nil && (uint64(createTimeMs/1000) == service.startTimeSecs) {
+		if err != nil && (uint64(createTimeMs) == service.startTimeMillis) {
 			return service, true
 		}
 	}
@@ -322,23 +341,24 @@ func (s *discovery) getCachedInfo(proc *process.Process) (*serviceInfo, bool) {
 
 // getEnvs gets the environment variables for the process, both the initial
 // ones, and if present, the ones injected via the auto injector.
-func getEnvironmentVariables(proc *process.Process) (map[string]string, error) {
+func getEnvVars(proc *process.Process) (envs.Variables, error) {
+	var envVars = envs.Variables{}
+
 	// This calls Win32 GetProcessEnvironmentVariables
 	procEnvs, err := proc.Environ()
 	if err != nil {
-		return nil, err
+		return envVars, err
 	}
 
 	// Split the name/value pairs.
-	envs := make(map[string]string, len(procEnvs))
 	for _, env := range procEnvs {
-		name, val, found := strings.Cut(env, "=")
+		name, value, found := strings.Cut(env, "=")
 		if found {
-			envs[name] = val
+			envVars.Set(name, value)
 		}
 	}
 
-	return envs, nil
+	return envVars, nil
 }
 
 // ignoreComms is a list of process names (matched against /proc/PID/comm) to
@@ -368,7 +388,7 @@ func (s *discovery) cleanCache(newServiceInfos map[int32]*serviceInfo) {
 	for pid, oldInfo := range s.cache {
 		if newInfo, alive := newServiceInfos[pid]; alive {
 			// PIDs can be reused.  Keep the info only if the start time matches.
-			if oldInfo.startTimeSecs == newInfo.startTimeSecs {
+			if oldInfo.startTimeMillis == newInfo.startTimeMillis {
 				continue
 			}
 

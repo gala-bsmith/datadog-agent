@@ -7,12 +7,43 @@
 package apm
 
 import (
+	"strings"
+
+	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/servicediscovery/envs"
 	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/servicediscovery/language"
 	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/servicediscovery/usm"
 )
 
-// detectInternals performs more specialized detection based on the language
-func detectInternals(_ int32, _ []string, _ map[string]string, _ language.Language, _ usm.DetectorContextMap) Instrumentation {
-	// TODO: Add specialized detectors.
+// Instrumentation represents the state of APM instrumentation for a service.
+type Instrumentation string
+
+const (
+	// None means the service is not instrumented with APM.
+	None Instrumentation = "none"
+	// Provided means the service has been manually instrumented.
+	Provided Instrumentation = "provided"
+	// Injected means the service is using automatic APM injection.
+	Injected Instrumentation = "injected"
+)
+
+// Detect attempts to detect the type of APM instrumentation for the given service.
+func Detect(_ language.Language, ctx usm.DetectionContext) Instrumentation {
+	// first check to see if the DD_INJECTION_ENABLED is set to tracer
+	if isInjected(ctx.Envs) {
+		return Injected
+	}
+
 	return None
+}
+
+func isInjected(envs envs.Variables) bool {
+	if val, ok := envs.Get("DD_INJECTION_ENABLED"); ok {
+		parts := strings.Split(val, ",")
+		for _, v := range parts {
+			if v == "tracer" {
+				return true
+			}
+		}
+	}
+	return false
 }
