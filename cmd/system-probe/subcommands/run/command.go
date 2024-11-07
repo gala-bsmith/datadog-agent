@@ -280,6 +280,10 @@ func runSystemProbe(ctxChan <-chan context.Context, errChan chan error) error {
 		workloadmetafx.Module(workloadmeta.Params{
 			AgentType: workloadmeta.Remote,
 		}),
+		// Provide tagger module
+		taggerimpl.Module(),
+		// Provide the corresponding tagger Params to configure the tagger
+		fx.Provide(tagger.NewNodeRemoteTaggerParams),
 		systemprobeloggerfx.Module(),
 		fx.Provide(func(sysprobeconfig sysprobeconfig.Component) settings.Params {
 			profilingGoRoutines := commonsettings.NewProfilingGoroutines()
