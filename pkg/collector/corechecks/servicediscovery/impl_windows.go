@@ -7,7 +7,6 @@ package servicediscovery
 
 import (
 	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/servicediscovery/model"
-	"github.com/DataDog/datadog-agent/pkg/collector/corechecks/servicediscovery/servicetype"
 	//pkgconfigsetup "github.com/DataDog/datadog-agent/pkg/config/setup"
 	processNet "github.com/DataDog/datadog-agent/pkg/process/net"
 	proccontainers "github.com/DataDog/datadog-agent/pkg/process/util/containers"
@@ -139,28 +138,29 @@ func (sd *windowsImpl) DiscoverServices() (*discoveredServices, error) {
 	}, nil
 }
 
-func (sd *windowsImpl) getServiceInfo(service model.Service) serviceInfo {
-	// if the process name is docker-proxy, we should talk to docker to get the process command line and env vars
-	// have to see how far this can go but not for the initial release
+/*
+	func (sd *windowsImpl) getServiceInfo(service model.Service) serviceInfo {
+		// if the process name is docker-proxy, we should talk to docker to get the process command line and env vars
+		// have to see how far this can go but not for the initial release
 
-	// for now, docker-proxy is going on the ignore list
+		// for now, docker-proxy is going on the ignore list
 
-	serviceType := servicetype.Detect(service.Ports)
+		serviceType := servicetype.Detect(service.Ports)
 
-	meta := ServiceMetadata{
-		Name:               service.Name,
-		Language:           service.Language,
-		Type:               string(serviceType),
-		APMInstrumentation: service.APMInstrumentation,
+		meta := ServiceMetadata{
+			Name:               service.Name,
+			Language:           service.Language,
+			Type:               string(serviceType),
+			APMInstrumentation: service.APMInstrumentation,
+		}
+
+		return serviceInfo{
+			meta:          meta,
+			service:       service,
+			LastHeartbeat: sd.time.Now(),
+		}
 	}
-
-	return serviceInfo{
-		meta:          meta,
-		service:       service,
-		LastHeartbeat: sd.time.Now(),
-	}
-}
-
+*/
 type systemProbeClient interface {
 	GetDiscoveryServices() (*model.ServicesResponse, error)
 }
