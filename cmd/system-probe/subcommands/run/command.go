@@ -118,6 +118,9 @@ func Commands(globalParams *command.GlobalParams) []*cobra.Command {
 				taggerimpl.Module(),
 				// Provide the corresponding tagger Params to configure the tagger
 				fx.Provide(tagger.NewNodeRemoteTaggerParams),
+				fx.Invoke(func(wmeta workloadmeta.Component, tagger tagger.Component) {
+					proccontainers.InitSharedContainerProvider(wmeta, tagger)
+				}),
 				autoexitimpl.Module(),
 				pidimpl.Module(),
 				fx.Supply(pidimpl.NewParams(cliParams.pidfilePath)),
@@ -284,6 +287,9 @@ func runSystemProbe(ctxChan <-chan context.Context, errChan chan error) error {
 		taggerimpl.Module(),
 		// Provide the corresponding tagger Params to configure the tagger
 		fx.Provide(tagger.NewNodeRemoteTaggerParams),
+		fx.Invoke(func(wmeta workloadmeta.Component, tagger tagger.Component) {
+			proccontainers.InitSharedContainerProvider(wmeta, tagger)
+		}),
 		systemprobeloggerfx.Module(),
 		fx.Provide(func(sysprobeconfig sysprobeconfig.Component) settings.Params {
 			profilingGoRoutines := commonsettings.NewProfilingGoroutines()
@@ -371,9 +377,7 @@ func startSystemProbe(log log.Component, statsd compstatsd.Component, telemetry 
 		}()
 	}
 
-	proccontainers.InitSharedContainerProvider(wmeta, tagger)
-
-	if err = api.StartServer(cfg, telemetry, wmeta, settings); err != nil {
+	if err = api.StartServer(cfg, telemetry, wmeta, settings, tagger); err != nil {
 		return log.Criticalf("error while starting api server, exiting: %v", err)
 	}
 	return nil

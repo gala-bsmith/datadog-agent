@@ -16,6 +16,7 @@ import (
 	"github.com/gorilla/mux"
 
 	sysconfigtypes "github.com/DataDog/datadog-agent/cmd/system-probe/config/types"
+	"github.com/DataDog/datadog-agent/comp/core/tagger"
 	"github.com/DataDog/datadog-agent/comp/core/telemetry"
 	workloadmeta "github.com/DataDog/datadog-agent/comp/core/workloadmeta/def"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
@@ -63,7 +64,7 @@ func withModule(name sysconfigtypes.ModuleName, fn func()) {
 // * Initialization using the provided Factory;
 // * Registering the HTTP endpoints of each module;
 // * Register the gRPC server;
-func Register(cfg *sysconfigtypes.Config, httpMux *mux.Router, factories []Factory, wmeta workloadmeta.Component, telemetry telemetry.Component) error {
+func Register(cfg *sysconfigtypes.Config, httpMux *mux.Router, factories []Factory, wmeta workloadmeta.Component, telemetry telemetry.Component, tagger tagger.Component) error {
 	var enabledModulesFactories []Factory
 	for _, factory := range factories {
 		if !cfg.ModuleIsEnabled(factory.Name) {
@@ -84,6 +85,7 @@ func Register(cfg *sysconfigtypes.Config, httpMux *mux.Router, factories []Facto
 			deps := FactoryDependencies{
 				WMeta:     wmeta,
 				Telemetry: telemetry,
+				Tagger:    tagger,
 			}
 			module, err = factory.Fn(cfg, deps)
 		})
