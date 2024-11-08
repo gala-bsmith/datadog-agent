@@ -43,8 +43,6 @@ func GenerateLocationExpression(param *ditypes.Parameter) {
 
 			// Check if this instrumentation target is directly assigned
 			if elementParam.Location != nil {
-				// This element is directly assigned
-
 				if elementParam.Kind == uint(reflect.Array) {
 					//TODO
 				}
@@ -59,7 +57,7 @@ func GenerateLocationExpression(param *ditypes.Parameter) {
 				// This is not directly assigned, expect the address for it on the stack
 				if elementParam.Kind == uint(reflect.Pointer) {
 					elementParam.LocationExpressions = append(elementParam.LocationExpressions,
-						ditypes.DirectReadLocationExpression(elementParam),
+						ditypes.DereferenceLocationExpression(uint(elementParam.TotalSize)),
 					)
 				} else if elementParam.Kind == uint(reflect.Struct) {
 					// Structs don't provide context on location, or have values themselves
@@ -98,12 +96,6 @@ func GenerateLocationExpression(param *ditypes.Parameter) {
 					if len(elementParam.ParameterPieces) != 3 {
 						continue
 					}
-
-					// For each element in the slice:
-					// - Read the pointer to the array onto the stack
-					// - Add offset equal to (i*slice_element_size)  ( i is loop for the 0:max_slice_length )
-					// - Append the expressions for reading the kind of element, which expect the address of it on the stack
-
 					ptr := elementParam.ParameterPieces[0]
 					len := elementParam.ParameterPieces[1]
 					sliceElementType := ptr.ParameterPieces[0]
@@ -156,7 +148,9 @@ func GenerateLocationExpression(param *ditypes.Parameter) {
 					elementParam.LocationExpressions = append(elementParam.LocationExpressions, ditypes.InsertLabel(labelName))
 					continue
 				} else {
-					elementParam.LocationExpressions = append(elementParam.LocationExpressions, ditypes.ApplyOffsetLocationExpression(uint(elementParam.FieldOffset)), ditypes.DereferenceToOutputLocationExpression(uint(elementParam.TotalSize)))
+					elementParam.LocationExpressions = append(elementParam.LocationExpressions,
+						ditypes.ApplyOffsetLocationExpression(uint(elementParam.FieldOffset)),
+						ditypes.DereferenceToOutputLocationExpression(uint(elementParam.TotalSize)))
 				}
 			}
 		}
