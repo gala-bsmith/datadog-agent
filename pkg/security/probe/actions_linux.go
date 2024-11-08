@@ -9,6 +9,7 @@
 package probe
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -48,11 +49,15 @@ type HashActionReport struct {
 }
 
 // IsResolved return if the action is resolved
-func (k *HashActionReport) IsResolved() bool {
+func (k *HashActionReport) IsResolved() (bool, error) {
 	k.RLock()
 	defer k.RUnlock()
 
-	return k.resolved
+	if k.resolved {
+		return k.resolved, nil
+	}
+
+	return false, fmt.Errorf("hash action current state: %+v", k)
 }
 
 // ToJSON marshal the action

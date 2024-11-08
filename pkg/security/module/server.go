@@ -62,7 +62,8 @@ type pendingMsg struct {
 
 func (p *pendingMsg) isResolved() bool {
 	for _, report := range p.actionReports {
-		if !report.IsResolved() {
+		if ok, err := report.IsResolved(); !ok {
+			seclog.Debugf("action report not resolved: %v", err)
 			return false
 		}
 	}
