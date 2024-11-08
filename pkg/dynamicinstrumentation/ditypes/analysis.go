@@ -98,6 +98,9 @@ const (
 	OpPop
 	OpPopDynamic
 	OpCopy
+	OpLabel
+	OpSetGlobalLimit
+	OpJumpIfGreaterThanLimit
 )
 
 func (op LocationExpressionOpcode) String() string {
@@ -243,11 +246,28 @@ func PopDynamicLocationExpression(elementSize uint) LocationExpression {
 	return LocationExpression{Opcode: OpPopDynamic, Arg1: elementSize}
 }
 
+// No args, just set label
+func InsertLabel(label string) LocationExpression {
+	return LocationExpression{Opcode: OpLabel, Label: label}
+}
+
+// Arg1 = limit to set
+func SetGlobalLimitVariable(limit uint) LocationExpression {
+	return LocationExpression{Opcode: OpSetGlobalLimit, Arg1: limit}
+}
+
+// Arg1 = value to compare to global limit variable
+// Label = label to jump to if the value is equal to the global limit variable
+func JumpToLabelIfEqualToLimit(val uint, label string) LocationExpression {
+	return LocationExpression{Opcode: OpJumpIfGreaterThanLimit, Arg1: val, Label: label}
+}
+
 type LocationExpression struct {
 	Opcode        LocationExpressionOpcode
 	Arg1          uint
 	Arg2          uint
 	Arg3          uint
+	Label         string
 	InstructionID string
 }
 

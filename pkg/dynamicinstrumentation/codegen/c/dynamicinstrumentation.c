@@ -45,6 +45,8 @@ int {{.GetBPFFuncName}}(struct pt_regs *ctx)
 {
     bpf_printk("{{.GetBPFFuncName}} probe in {{.ServiceName}} has triggered");
 
+    __u16 collectionLimit = 0;
+
     // reserve space on ringbuffer
     struct event *event;
     event = bpf_ringbuf_reserve(&events, sizeof(struct event), 0);

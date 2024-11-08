@@ -218,3 +218,26 @@ __u64 holder_{{.InstructionID}};
 bpf_map_peek_elem(&param_stack, &holder_{{.InstructionID}});
 bpf_map_push_elem(&param_stack, &holder_{{.InstructionID}}, 0);
 `
+
+var labelTemplateText = `
+{{.Label}}:
+`
+
+var setGlobalLimitText = `
+// Arg1 = Maximum limit
+
+// Read the 2 byte length from top of the stack, then set collectionLimit to the minimum of the two
+__u64 length_{{.InstructionID}};
+bpf_map_pop_elem(&param_stack, &length_{{.InstructionID}});
+
+collectionLimit = (__u16)length_{{.InstructionID}};
+if (collectionLimit > {{.Arg1}}) {
+    collectionLimit = {{.Arg1}};
+}
+`
+
+var jumpIfGreaterThanLimitText = `
+if ({{.Arg1}} == collectionLimit) {
+    goto {{.Label}};
+}
+`

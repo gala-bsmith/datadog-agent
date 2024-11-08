@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/DataDog/datadog-agent/pkg/dynamicinstrumentation/ditypes"
+	"golang.org/x/exp/rand"
 )
 
 // GenerateLocationExpression takes metadata about a parameter, including its type and location, and generates a list of
@@ -112,10 +113,7 @@ func GenerateLocationExpression(param *ditypes.Parameter) {
 					GenerateLocationExpression(&ptr.ParameterPieces[0])
 					expressionsToUseForEachSliceElement := collectAndRemoveLocationExpressions(&ptr.ParameterPieces[0])
 
-					// TODO: Need a way to short circuit slices:
-					// - instruction in between each element that reads the slice length and compares it to current
-					//   instruction being read (i.e. pass in `i`)
-
+					labelName := randomLabel()
 					if ptr.Location != nil && len.Location != nil {
 						// Fields of the slice are directly assigned
 						len.TotalSize = 2
@@ -123,9 +121,12 @@ func GenerateLocationExpression(param *ditypes.Parameter) {
 							// Read slice length to output buffer:
 							ditypes.DirectReadLocationExpression(&len),
 							ditypes.PopLocationExpression(1, 2),
+							ditypes.DirectReadLocationExpression(&len),
+							ditypes.SetGlobalLimitVariable(uint(ditypes.SliceMaxLength)),
 						)
-						for i := 0; i < ditypes.SliceMaxLength; i++ { //FIXME: add short circuit for if length is less
+						for i := 0; i < ditypes.SliceMaxLength; i++ {
 							elementParam.LocationExpressions = append(elementParam.LocationExpressions,
+								ditypes.JumpToLabelIfEqualToLimit(uint(i), labelName),
 								// Read the slice element:
 								ditypes.DirectReadLocationExpression(&ptr),
 								ditypes.ApplyOffsetLocationExpression(uint(sliceElementType.TotalSize)*uint(i)),
@@ -133,22 +134,26 @@ func GenerateLocationExpression(param *ditypes.Parameter) {
 							elementParam.LocationExpressions = append(elementParam.LocationExpressions, expressionsToUseForEachSliceElement...)
 						}
 					} else {
-						// Expect address on stack, use offsets accordingly
+						// Expect address of the slice struct on stack, use offsets accordingly
 						elementParam.LocationExpressions = append(elementParam.LocationExpressions,
-							ditypes.DereferenceLocationExpression(8), // Put the array pointer onto the stack
-							// Read the slice length to output:
-							ditypes.CopyLocationExpression(),
-							ditypes.ApplyOffsetLocationExpression(8),
-							ditypes.DereferenceToOutputLocationExpression(8),
+							ditypes.CopyLocationExpression(),         // Setup stack so it has two pointers to slice struct
+							ditypes.ApplyOffsetLocationExpression(8), // Change the top pointer to the address of the length field
+							ditypes.DereferenceLocationExpression(8), // Dereference to place length on top of the stack
+							ditypes.CopyLocationExpression(),         // Copy the length so it can be used for setting the global limit, and being sent to output
+							ditypes.SetGlobalLimitVariable(uint(ditypes.SliceMaxLength)),
+							ditypes.PopLocationExpression(1, 2),
 						)
-						for i := 0; i < ditypes.SliceMaxLength; i++ { //FIXME: add short circuit for if length is less
+						// Pointer to slice struct on stack
+						for i := 0; i < ditypes.SliceMaxLength; i++ {
 							elementParam.LocationExpressions = append(elementParam.LocationExpressions,
+								ditypes.JumpToLabelIfEqualToLimit(uint(i), labelName),
 								ditypes.CopyLocationExpression(),
 								ditypes.ApplyOffsetLocationExpression(uint(i*(int(sliceElementType.TotalSize)))),
 							)
 							elementParam.LocationExpressions = append(elementParam.LocationExpressions, expressionsToUseForEachSliceElement...)
 						}
 					}
+					elementParam.LocationExpressions = append(elementParam.LocationExpressions, ditypes.InsertLabel(labelName))
 					continue
 				} else {
 					elementParam.LocationExpressions = append(elementParam.LocationExpressions, ditypes.ApplyOffsetLocationExpression(uint(elementParam.FieldOffset)), ditypes.DereferenceToOutputLocationExpression(uint(elementParam.TotalSize)))
@@ -226,3 +231,12 @@ func isBasicType(kind uint) bool {
 	shallowCopy := make([]Person, len(original))
 	copy(shallowCopy, original)
 */
+
+func randomLabel() string {
+	length := 6
+	randomString := make([]byte, length)
+	for i := 0; i < length; i++ {
+		randomString[i] = byte(65 + rand.Intn(25))
+	}
+	return string(randomString)
+}
