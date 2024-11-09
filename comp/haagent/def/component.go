@@ -6,9 +6,9 @@
 // Package haagent ... /* TODO: detailed doc comment for the component */
 package haagent
 
-// team: /* TODO: add team name */
+// team: network-device-monitoring
 
 // Component is the component type.
 type Component interface {
-    /* TODO: define Component interface */
+	/* TODO: define Component interface */
 }
