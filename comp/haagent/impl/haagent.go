@@ -7,14 +7,15 @@
 package haagentimpl
 
 import (
+	"github.com/DataDog/datadog-agent/comp/core/config"
+	log "github.com/DataDog/datadog-agent/comp/core/log/def"
 	haagent "github.com/DataDog/datadog-agent/comp/haagent/def"
-	compdef "github.com/DataDog/datadog-agent/comp/def"
 )
 
 // Requires defines the dependencies for the haagent component
 type Requires struct {
-	// Remove this field if the component has no lifecycle hooks
-	Lifecycle compdef.Lifecycle
+	Logger      log.Component
+	AgentConfig config.Component
 }
 
 // Provides defines the output of the haagent component
@@ -24,8 +25,9 @@ type Provides struct {
 
 // NewComponent creates a new haagent component
 func NewComponent(reqs Requires) (Provides, error) {
-	// TODO: Implement the haagent component
-
-	provides := Provides{}
+	haAgentConfigs := newConfig(reqs.AgentConfig)
+	provides := Provides{
+		Comp: newHaAgentImpl(reqs.Logger, haAgentConfigs),
+	}
 	return provides, nil
 }

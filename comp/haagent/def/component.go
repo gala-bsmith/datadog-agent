@@ -3,12 +3,12 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2024-present Datadog, Inc.
 
-// Package haagent ... /* TODO: detailed doc comment for the component */
+// Package haagent handles states for HA Agent feature.
 package haagent
 
 // team: network-device-monitoring
 
 // Component is the component type.
 type Component interface {
-	/* TODO: define Component interface */
+	IsLeader() bool
 }

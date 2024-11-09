@@ -11,11 +11,24 @@ package mock
 import (
 	"testing"
 
+	log "github.com/DataDog/datadog-agent/comp/core/log/def"
 	haagent "github.com/DataDog/datadog-agent/comp/haagent/def"
 )
 
+type mock struct {
+	Logger log.Component
+}
+
+func (m *mock) IsLeader() bool { return false }
+
+// Provides that defines the output of mocked snmpscan component
+type Provides struct {
+	comp haagent.Component
+}
+
 // Mock returns a mock for haagent component.
-func Mock(t *testing.T) haagent.Component {
-	// TODO: Implement the haagent mock
-	return nil
+func Mock(t *testing.T) Provides {
+	return Provides{
+		comp: &mock{},
+	}
 }
