@@ -43,16 +43,34 @@ func GenerateLocationExpression(param *ditypes.Parameter) {
 
 			// Check if this instrumentation target is directly assigned
 			if elementParam.Location != nil {
+				// Type is directly assigned
 				if elementParam.Kind == uint(reflect.Array) {
-					//TODO
+					if elementParam.TotalSize == 0 && len(elementParam.ParameterPieces) == 0 {
+						continue
+					}
+					GenerateLocationExpression(&elementParam.ParameterPieces[0])
+					expressionsToUseForEachArrayElement := collectAndRemoveLocationExpressions(&elementParam.ParameterPieces[0])
+					elementParam.LocationExpressions = append(elementParam.LocationExpressions,
+						// Read process stack address to the stack
+						ditypes.ReadRegisterLocationExpression(ditypes.StackRegister, 8),
+						ditypes.ApplyOffsetLocationExpression(uint(elementParam.Location.StackOffset)),
+					)
+					//FIXME: Do we need to limit lengths of arrays??
+					for i := 0; i < len(elementParam.ParameterPieces); i++ {
+						elementParam.LocationExpressions = append(elementParam.LocationExpressions,
+							ditypes.CopyLocationExpression(),
+							ditypes.ApplyOffsetLocationExpression(uint(i*(int(elementParam.ParameterPieces[0].TotalSize)))),
+						)
+						elementParam.LocationExpressions = append(elementParam.LocationExpressions, expressionsToUseForEachArrayElement...)
+					}
 				}
-
 				elementParam.LocationExpressions = append(elementParam.LocationExpressions, ditypes.DirectReadLocationExpression(elementParam))
 				if elementParam.Kind != uint(reflect.Pointer) {
 					// Since this isn't a pointer, we can just directly read
 					elementParam.LocationExpressions = append(elementParam.LocationExpressions, ditypes.PopLocationExpression(1, uint(elementParam.TotalSize)))
 				}
 				continue
+				/* end directly assigned types */
 			} else {
 				// This is not directly assigned, expect the address for it on the stack
 				if elementParam.Kind == uint(reflect.Pointer) {
@@ -92,6 +110,7 @@ func GenerateLocationExpression(param *ditypes.Parameter) {
 						)
 					}
 					continue
+					/* end parsing strings */
 				} else if elementParam.Kind == uint(reflect.Slice) {
 					if len(elementParam.ParameterPieces) != 3 {
 						continue
@@ -147,6 +166,22 @@ func GenerateLocationExpression(param *ditypes.Parameter) {
 					}
 					elementParam.LocationExpressions = append(elementParam.LocationExpressions, ditypes.InsertLabel(labelName))
 					continue
+					/* end parsing slices */
+				} else if elementParam.Kind == uint(reflect.Array) {
+					// Expect the address of the array itself on the stack
+					if elementParam.TotalSize == 0 && len(elementParam.ParameterPieces) == 0 {
+						continue
+					}
+					//FIXME: Do we need to limit lengths of arrays??
+					GenerateLocationExpression(&elementParam.ParameterPieces[0])
+					expressionsToUseForEachArrayElement := collectAndRemoveLocationExpressions(&elementParam.ParameterPieces[0])
+					for i := 0; i < len(elementParam.ParameterPieces); i++ {
+						elementParam.LocationExpressions = append(elementParam.LocationExpressions,
+							ditypes.CopyLocationExpression(),
+							ditypes.ApplyOffsetLocationExpression(uint(int(elementParam.ParameterPieces[0].TotalSize)*i)),
+						)
+						elementParam.LocationExpressions = append(elementParam.LocationExpressions, expressionsToUseForEachArrayElement...)
+					}
 				} else {
 					elementParam.LocationExpressions = append(elementParam.LocationExpressions,
 						ditypes.ApplyOffsetLocationExpression(uint(elementParam.FieldOffset)),
