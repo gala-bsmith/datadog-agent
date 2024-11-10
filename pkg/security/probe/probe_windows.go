@@ -107,6 +107,8 @@ type WindowsProbe struct {
 	isWriteEnabled            bool
 	isDeleteEnabled           bool
 	isChangePermissionEnabled bool
+	isRegistrySessionNeeded   bool
+
 	// channel handling.  Currently configurable, but should probably be set
 	// to false with a configurable size value
 	blockonchannelsend bool
@@ -365,9 +367,16 @@ func (p *WindowsProbe) reconfigureProvider() error {
 		return err
 	}
 
-	if err := p.fimSession.EnableProvider(p.regguid); err != nil {
-		log.Warnf("Error enabling provider %v", err)
-		return err
+	if p.isRegistrySessionNeeded {
+		if err := p.fimSession.EnableProvider(p.regguid); err != nil {
+			log.Warnf("Error enabling provider %v", err)
+			return err
+		}
+	} else {
+		if err := p.fimSession.DisableProvider(p.regguid); err != nil {
+			log.Warnf("Error enabling provider %v", err)
+			return err
+		}
 	}
 
 	return nil
@@ -1276,6 +1285,7 @@ func (p *WindowsProbe) ApplyRuleSet(rs *rules.RuleSet) (*kfilters.ApplyRuleSetRe
 	p.isRenameEnabled = false
 	p.isDeleteEnabled = false
 	p.isChangePermissionEnabled = false
+	p.isRegistrySessionNeeded = false
 	p.currentEventTypes = rs.GetEventTypes()
 
 	for _, eventType := range p.currentEventTypes {
@@ -1288,6 +1298,8 @@ func (p *WindowsProbe) ApplyRuleSet(rs *rules.RuleSet) (*kfilters.ApplyRuleSetRe
 			p.isDeleteEnabled = true
 		case model.ChangePermissionEventType.String():
 			p.isChangePermissionEnabled = true
+		case model.CreateRegistryKeyEventType.String(), model.OpenRegistryKeyEventType.String(), model.SetRegistryKeyValueEventType.String(), model.DeleteRegistryKeyEventType.String():
+			p.isRegistrySessionNeeded = true
 		}
 	}
 

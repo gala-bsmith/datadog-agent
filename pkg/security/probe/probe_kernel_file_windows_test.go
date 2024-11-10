@@ -43,6 +43,7 @@ func createTestProbe() (*WindowsProbe, error) {
 	wp.isRenameEnabled = true
 	wp.isDeleteEnabled = true
 	wp.isWriteEnabled = true
+	wp.isRegistrySessionNeeded = true
 
 	err = wp.Init()
 
