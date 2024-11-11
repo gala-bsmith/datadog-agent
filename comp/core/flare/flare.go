@@ -125,10 +125,10 @@ func (f *flare) onAgentTaskEvent(taskType rcclienttypes.TaskType, task rcclientt
 	flareArgs := types.FlareArgs{}
 	if enableProfiling == "true" {
 		// RC expects the agent task operation to provide reasonable default flare args
-		flareArgs.ProfileDuration = time.Second * 60
+		flareArgs.ProfileDuration = f.config.GetDuration("flare_rc_profiling_runtime")
 		// flareArgs.ProfileMutex = ...
 	} else if enableProfiling != "false" {
-		f.log.Warnf("Unrecognized value passed via enable_profiling, creating flare without profiling enabled: %s", enableProfiling)
+		f.log.Infof("Unrecognized value passed via enable_profiling, creating flare without profiling enabled: %s", enableProfiling)
 	}
 
 	filePath, err := f.CreateWithArgs(flareArgs, 0, nil)

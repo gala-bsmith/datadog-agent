@@ -153,8 +153,6 @@ type FlareBuilder interface {
 type FlareArgs struct {
 	StreamLogsDuration   time.Duration // Add stream-logs data to the flare. It will collect logs for the amount of seconds passed to the flag
 	ProfileDuration      time.Duration // Add performance profiling data to the flare. It will collect a heap profile and a CPU profile for the amount of seconds passed to the flag, with a minimum of 30s
-	ProfileMutex         bool          // Add mutex profile to the performance data in the flare
 	ProfileMutexFraction int           // Set the fraction of mutex contention events that are reported in the mutex profile
-	ProfileBlocking      bool          // Add gorouting blocking profile to the performance data in the flare
 	ProfileBlockingRate  int           // Set the fraction of goroutine blocking events that are reported in the blocking profile
 }
