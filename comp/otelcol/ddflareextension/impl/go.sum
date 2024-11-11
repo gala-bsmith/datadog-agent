@@ -616,6 +616,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/internal/metadataprovi
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/metadataproviders v0.111.0/go.mod h1:tgQHCvogGlsnxQgtyhy+OwvBF4FDmK8dPlxs6nahdWs=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/pdatautil v0.111.0 h1:g9U+7hjEm1yUgaO1rJxstfLW7aEeo3S1tUyyvMlf7A8=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/pdatautil v0.111.0/go.mod h1:tL9m9RF+SGLi80ai1SAy1S/o60kedifzjy0gtGQsnmY=
+github.com/open-telemetry/opentelemetry-collector-contrib/pkg/datadog v0.111.0 h1:3QnfNnyA6OmgR0UDj6Q5zGblN5qxWMdZHVnOjVrBkD0=
+github.com/open-telemetry/opentelemetry-collector-contrib/pkg/datadog v0.111.0/go.mod h1:1AVaeAjt+WT6D+PfIVS9C8IGSiq8FFj0murp0TFbSSo=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/golden v0.111.0 h1:0MJmp4O7KUQOUmQYJEGNgtf30Nhx/3nLMn0jnU4Klhw=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/golden v0.111.0/go.mod h1:4PYgwpscyZUUdQVLsd7dh+LXtm1QbWCvU47P3G/7tLg=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl v0.111.0 h1:W0SthymNSB2fzGuY2KUib6EVyj/uGO3hJvaM6nW0evE=
