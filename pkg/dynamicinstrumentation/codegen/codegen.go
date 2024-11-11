@@ -99,9 +99,7 @@ func generateHeaderText(param ditypes.Parameter, out io.Writer) error {
 func generateParametersTextViaLocationExpressions(params []ditypes.Parameter, out io.Writer) error {
 
 	for i := range params {
-
 		collectedExpressions := collectLocationExpressions(&params[i])
-		ditypes.PrintExpressions(collectedExpressions)
 		for _, locationExpression := range collectedExpressions {
 			locationExpression.InstructionID = randomID()
 			template, err := resolveLocationExpressionTemplate(locationExpression)

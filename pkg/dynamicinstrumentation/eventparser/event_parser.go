@@ -67,7 +67,6 @@ func ParseParams(record []byte) ([]*ditypes.Param, error) {
 }
 
 func readParams(values []byte) []*ditypes.Param {
-	fmt.Println(values[0:100])
 	outputParams := []*ditypes.Param{}
 	for i := 0; i < MaxBufferSize; {
 		if i+3 >= len(values) {
@@ -165,11 +164,6 @@ func parseParamValue(definition *ditypes.Param, buffer []byte) (*ditypes.Param, 
 			if bufferIndex+int(paramDefinition.Size) >= len(buffer) {
 				break
 			}
-			// Pointers are unique in that they have their own value, and sub-fields.
-			// We parse the value of it from the buffer, place it in the value for
-			// the pointer itself, then pop the next value and place it as a sub-field.
-			paramDefinition.ValueStr = parseIndividualValue(paramDefinition.Kind, buffer[bufferIndex:bufferIndex+int(paramDefinition.Size)])
-			bufferIndex += int(paramDefinition.Size)
 			paramDefinition.Fields = append(paramDefinition.Fields, valueStack.pop())
 			valueStack.push(paramDefinition)
 		} else {
