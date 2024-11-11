@@ -52,6 +52,10 @@ func test_unsafe_pointer(x unsafe.Pointer) {}
 
 //nolint:all
 //go:noinline
+func test_array_pointer(x *[2]uint) {}
+
+//nolint:all
+//go:noinline
 func test_uint_pointer(x *uint) {}
 
 //nolint:all
@@ -125,4 +129,7 @@ func ExecutePointerFuncs() {
 	test_linked_list(b)
 
 	test_unsafe_pointer(unsafe.Pointer(&b))
+
+	aruint := [2]uint{1, 2}
+	test_array_pointer(&aruint)
 }
