@@ -74,6 +74,7 @@ func readParams(values []byte) []*ditypes.Param {
 			break
 		}
 		paramTypeDefinition := parseTypeDefinition(values[i:])
+		pretty.Log(paramTypeDefinition)
 		if paramTypeDefinition == nil {
 			break
 		}
@@ -149,7 +150,7 @@ func parseParamValue(definition *ditypes.Param, buffer []byte) (*ditypes.Param, 
 			bufferIndex += 2
 			paramDefinition.Size = size
 			paramDefinition.ValueStr = string(buffer[bufferIndex : bufferIndex+int(size)])
-			bufferIndex += int(ditypes.StringMaxSize) // FIXME: Needs to be max value, not variable size
+			bufferIndex += int(ditypes.StringMaxSize)
 			valueStack.push(paramDefinition)
 		} else if !isTypeWithHeader(paramDefinition.Kind) {
 			if bufferIndex+int(paramDefinition.Size) >= len(buffer) {

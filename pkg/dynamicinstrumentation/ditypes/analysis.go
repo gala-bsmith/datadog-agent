@@ -80,6 +80,10 @@ func (s SpecialKind) String() string {
 	}
 }
 
+func (l LocationExpression) String() string {
+	return fmt.Sprintf("%s (%d, %d, %d)", l.Opcode.String(), l.Arg1, l.Arg2, l.Arg3)
+}
+
 type LocationExpressionOpcode uint
 
 const (

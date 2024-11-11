@@ -44,7 +44,6 @@ func GenerateBPFParamsCode(procInfo *ditypes.ProcessInfo, probe *ditypes.Probe) 
 		log.Info("Not capturing parameters")
 	}
 
-	fmt.Println(">", out.String())
 	probe.InstrumentationInfo.BPFParametersSourceCode = out.String()
 	return nil
 }
@@ -102,7 +101,7 @@ func generateParametersTextViaLocationExpressions(params []ditypes.Parameter, ou
 	for i := range params {
 
 		collectedExpressions := collectLocationExpressions(&params[i])
-
+		ditypes.PrintExpressions(collectedExpressions)
 		for _, locationExpression := range collectedExpressions {
 			locationExpression.InstructionID = randomID()
 			template, err := resolveLocationExpressionTemplate(locationExpression)

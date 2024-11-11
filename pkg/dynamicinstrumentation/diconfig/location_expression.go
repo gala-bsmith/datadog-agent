@@ -63,11 +63,12 @@ func GenerateLocationExpression(param *ditypes.Parameter) {
 						)
 						elementParam.LocationExpressions = append(elementParam.LocationExpressions, expressionsToUseForEachArrayElement...)
 					}
-				}
-				elementParam.LocationExpressions = append(elementParam.LocationExpressions, ditypes.DirectReadLocationExpression(elementParam))
-				if elementParam.Kind != uint(reflect.Pointer) {
-					// Since this isn't a pointer, we can just directly read
-					elementParam.LocationExpressions = append(elementParam.LocationExpressions, ditypes.PopLocationExpression(1, uint(elementParam.TotalSize)))
+				} else {
+					elementParam.LocationExpressions = append(elementParam.LocationExpressions, ditypes.DirectReadLocationExpression(elementParam))
+					if elementParam.Kind != uint(reflect.Pointer) {
+						// Since this isn't a pointer, we can just directly read
+						elementParam.LocationExpressions = append(elementParam.LocationExpressions, ditypes.PopLocationExpression(1, uint(elementParam.TotalSize)))
+					}
 				}
 				continue
 				/* end directly assigned types */

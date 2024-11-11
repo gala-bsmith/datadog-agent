@@ -10,56 +10,31 @@ package codegen
 var readRegisterTemplateText = `
 // Arg1 = register
 // Arg2 = size of element
-bpf_printk("Reading from register");
-
-__u64 valueHolder_{{.InstructionID}} = 0;
-bpf_probe_read(&valueHolder_{{.InstructionID}}, {{.Arg2}}, &ctx->DWARF_REGISTER({{.Arg1}}));
-bpf_map_push_elem(&param_stack, &valueHolder_{{.InstructionID}}, 0);
-
-bpf_printk("Pushed %d", valueHolder_{{.InstructionID}});
+read_register(context, {{.Arg1}}, {{.Arg2}});
 `
 
 var readStackTemplateText = `
 // Arg1 = stack offset
 // Arg2 = size of element
-bpf_printk("Reading from stack");
-
-__u64 valueHolder_{{.InstructionID}} = 0;
-bpf_probe_read(&valueHolder_{{.InstructionID}}, {{.Arg2}}, &ctx->DWARF_STACK_REGISTER+{{.Arg1}});
-bpf_printk("Value: %d", valueHolder_{{.InstructionID}});
-bpf_map_push_elem(&param_stack, &valueHolder_{{.InstructionID}}, 0);
-
-bpf_printk("Pushed %d", valueHolder_{{.InstructionID}});
+read_stack(context, {{.Arg1}}, {{.Arg2}});
 `
 
 var readRegisterValueToOutputTemplateText = `
 // Arg1 = register
 // Arg2 = size of element
-bpf_printk("Reading from register directly to output");
-bpf_probe_read(&event->output[outputOffset], {{.Arg2}}, &ctx->DWARF_REGISTER({{.Arg1}}));
-outputOffset += {{.Arg2}};
+read_register_value_to_output(context, {{.Arg1}}, {{.Arg2}});
 `
 
 var readStackValueToOutputTemplateText = `
 // Arg1 = stack offset
 // Arg2 = size of element
-bpf_printk("Reading from stack directly to output");
-bpf_probe_read(&event->output[outputOffset], {{.Arg2}}, &ctx->DWARF_STACK_REGISTER+{{.Arg1}});
-outputOffset += {{.Arg2}};
+read_stack_value_to_output(context, {{.Arg1}}, {{.Arg2}});
 `
 
 var popTemplateText = `
 // Arg1 = number of elements (u64) to pop
 // Arg2 = size of each element
-bpf_printk("Popping, printing each element as it's popped");
-__u64 valueHolder_{{.InstructionID}};
-
-for(i = 0; i < {{.Arg1}}; i++) {
-    bpf_map_pop_elem(&param_stack, &valueHolder_{{.InstructionID}});
-    bpf_printk("\t%d", valueHolder_{{.InstructionID}});
-    bpf_probe_read(&event->output[outputOffset+i], {{.Arg2}}, &valueHolder_{{.InstructionID}});
-    outputOffset += {{.Arg2}};
-}
+pop(context, {{.Arg1}}, {{.Arg2}});
 `
 
 var dereferenceTemplateText = `

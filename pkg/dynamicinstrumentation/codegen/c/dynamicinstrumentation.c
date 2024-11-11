@@ -2,43 +2,10 @@
 #include "bpf_tracing.h"
 #include "kconfig.h"
 #include <asm/ptrace.h>
+#include "macros.h"
 #include "types.h"
-
-#define MAX_STRING_SIZE {{ .InstrumentationInfo.InstrumentationOptions.StringMaxSize}}
-#define PARAM_BUFFER_SIZE {{ .InstrumentationInfo.InstrumentationOptions.ArgumentsMaxSize}}
-#define STACK_DEPTH_LIMIT 10
-#define MAX_SLICE_SIZE 1800
-#define MAX_SLICE_LENGTH 20
-
-struct {
-    __uint(type, BPF_MAP_TYPE_RINGBUF);
-    __uint(max_entries, 1 << 24);
-} events SEC(".maps");
-
-struct {
-    __uint(type, BPF_MAP_TYPE_ARRAY);
-    __uint(key_size, sizeof(__u32));
-    __uint(value_size, sizeof(char[PARAM_BUFFER_SIZE]));
-    __uint(max_entries, 1);
-} zeroval SEC(".maps");
-
-struct {
-	__uint(type, BPF_MAP_TYPE_STACK);
-	__uint(max_entries, 2048);
-	__type(value, __u64);
-} param_stack SEC(".maps");
-
-struct {
-	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
-	__uint(max_entries, 1);
-	__type(key, __u32);
-	__type(value, __u64[MAX_SLICE_SIZE]);
-} temp_storage_array SEC(".maps");
-
-struct event {
-    struct base_event base;
-    char output[PARAM_BUFFER_SIZE];
-};
+#include "maps.h"
+#include "expressions.h"
 
 SEC("uprobe/{{.GetBPFFuncName}}")
 int {{.GetBPFFuncName}}(struct pt_regs *ctx)
@@ -106,6 +73,12 @@ int {{.GetBPFFuncName}}(struct pt_regs *ctx)
 
     int chunk_size = 0;
     int outputOffset = 0;
+
+    struct expression_context context = {
+        .ctx = ctx,
+        .output_offset = &outputOffset,
+        .event = event
+    };
 	
     __u64 *temp_storage = bpf_map_lookup_elem(&temp_storage_array, &key) ;
     if (!temp_storage) {

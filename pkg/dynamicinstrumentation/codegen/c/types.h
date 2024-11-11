@@ -11,4 +11,15 @@ struct base_event {
     __u64 program_counters[10];
 }__attribute__((aligned(8)));
 
+struct event {
+    struct base_event base;
+    char output[PARAM_BUFFER_SIZE];
+};
+
+struct expression_context {
+    int *output_offset;
+    struct pt_regs *ctx;
+    struct event *event;
+};
+
 #endif
