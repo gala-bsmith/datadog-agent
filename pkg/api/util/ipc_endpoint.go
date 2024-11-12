@@ -6,7 +6,6 @@
 package util
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,9 +14,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/DataDog/datadog-agent/comp/core/config"
-	"github.com/DataDog/datadog-agent/pkg/util/log"
-	"github.com/DataDog/datadog-agent/pkg/util/system"
+	"github.com/DataDog/datadog-agent/pkg/config/model"
 )
 
 // IPCEndpoint is an endpoint that IPC requests will be sent to
@@ -101,37 +98,18 @@ func WithHostAndPort(cmdHost string, cmdPort int) func(*IPCEndpoint) {
 }
 
 // NewIPCEndpoint constructs a new IPC Endpoint using the given config, path, and options
-func NewIPCEndpoint(config config.Component, endpointPath string, options ...EndpointOption) (*IPCEndpoint, error) {
+func NewIPCEndpoint(config model.Reader, endpointPath string, options ...EndpointOption) (*IPCEndpoint, error) {
 	// sets a global `token` in `doget.go`
 	// TODO: add `token` to Endpoint struct, instead of storing it in a global var
 	if err := SetAuthToken(config); err != nil {
 		return nil, err
 	}
 
-	var cmdHostKey string
-	// ipc_address is deprecated in favor of cmd_host, but we still need to support it
-	// if it is set, use it, otherwise use cmd_host
-	if config.IsSet("ipc_address") {
-		log.Warn("ipc_address is deprecated, use cmd_host instead")
-		cmdHostKey = "ipc_address"
-	} else {
-		cmdHostKey = "cmd_host"
-	}
+	client := GetClient(WithNoVerify(), WithTimeout(0))
 
-	// only IPC over localhost is currently supported
-	ipcHost, err := system.IsLocalAddress(config.GetString(cmdHostKey))
-	if err != nil {
-		return nil, fmt.Errorf("%s: %s", cmdHostKey, err)
-	}
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	client := &http.Client{Transport: tr}
-
-	ipcPort := config.GetInt("cmd_port")
 	targetURL := url.URL{
 		Scheme: "https",
-		Host:   net.JoinHostPort(ipcHost, strconv.Itoa(ipcPort)),
+		Host:   CoreCmd,
 		Path:   endpointPath,
 	}
 

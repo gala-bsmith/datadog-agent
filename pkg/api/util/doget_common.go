@@ -7,6 +7,7 @@ package util
 
 import (
 	"context"
+	"fmt"
 	"net"
 
 	"github.com/DataDog/datadog-agent/pkg/util/log"
@@ -25,15 +26,18 @@ func newDialContext() dialContext {
 		}
 
 		if resolver, ok := db[host]; ok {
-			path, err := resolver()
+			resolvedAddr, err := resolver()
 
 			if err != nil {
 				return nil, err
 			}
+			if resolvedAddr == nil {
+				return nil, fmt.Errorf("unable to resolve addr: nil pointer netAddr")
+			}
 
-			log.Debugf("address %s registered in the Agent name resolver, reaching: %s", addr, path)
+			log.Debugf("address %s registered in the Agent name resolver, reaching: %s", addr, resolvedAddr.String())
 
-			return net.Dial("tcp", path)
+			return net.Dial(resolvedAddr.Network(), resolvedAddr.String())
 		}
 
 		log.Warnf("address not registered in the Agent name resolver: %s", addr)
