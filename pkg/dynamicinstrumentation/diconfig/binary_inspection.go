@@ -81,7 +81,7 @@ func AnalyzeBinary(procInfo *ditypes.ProcessInfo) error {
 	// Use the result from InspectWithDWARF to populate the locations of parameters
 	for functionName, functionMetadata := range r.Functions {
 		putLocationsInParams(functionMetadata.Parameters, r.StructOffsets, procInfo.TypeMap.Functions, functionName)
-		populateLocationExpressions(r.Functions, procInfo.TypeMap.Functions)
+		populateLocationExpressions(r.Functions, procInfo)
 		correctStructSizes(procInfo.TypeMap.Functions[functionName])
 	}
 
@@ -129,19 +129,30 @@ func collectFieldIDs(param ditypes.Parameter) []bininspect.FieldIdentifier {
 
 func populateLocationExpressions(
 	metadata map[string]bininspect.FunctionMetadata,
-	functions map[string][]ditypes.Parameter) error {
+	procInfo *ditypes.ProcessInfo) error {
+
+	functions := procInfo.TypeMap.Functions
+	probes := procInfo.GetProbes()
+	funcNamesToLimits := map[string]*ditypes.InstrumentationInfo{}
+	for i := range probes {
+		funcNamesToLimits[probes[i].FuncName] = probes[i].InstrumentationInfo
+	}
 
 	for funcName, parameters := range functions {
 		funcMetadata, ok := metadata[funcName]
 		if !ok {
 			return fmt.Errorf("no function metadata for function %s", funcName)
 		}
+		limitInfo, ok := funcNamesToLimits[funcName]
+		if !ok || limitInfo == nil {
+			continue
+		}
 
 		for i := range parameters {
 			if i >= len(funcMetadata.Parameters) {
 				return errors.New("parameter metadata does not line up with parameter itself")
 			}
-			GenerateLocationExpression(&parameters[i])
+			GenerateLocationExpression(limitInfo, &parameters[i])
 		}
 	}
 	return nil

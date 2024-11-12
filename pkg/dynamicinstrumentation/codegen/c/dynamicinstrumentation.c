@@ -2,8 +2,9 @@
 #include "bpf_tracing.h"
 #include "kconfig.h"
 #include <asm/ptrace.h>
+#include "base_event.h"
 #include "macros.h"
-#include "types.h"
+#include "event.h"
 #include "maps.h"
 #include "expressions.h"
 

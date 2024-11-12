@@ -20,7 +20,7 @@ import (
 //
 // It walks the tree of the parameter and its pieces, generating LocationExpressions for each piece.
 // The following logic is applied:
-func GenerateLocationExpression(param *ditypes.Parameter) {
+func GenerateLocationExpression(limitsInfo *ditypes.InstrumentationInfo, param *ditypes.Parameter) {
 	triePaths, expressionTargets := generateLocationVisitsMap(param)
 	for pathToInstrumentationTarget, instrumentationTarget := range expressionTargets {
 		pathElements := []string{pathToInstrumentationTarget}
@@ -48,7 +48,7 @@ func GenerateLocationExpression(param *ditypes.Parameter) {
 					if elementParam.TotalSize == 0 && len(elementParam.ParameterPieces) == 0 {
 						continue
 					}
-					GenerateLocationExpression(&elementParam.ParameterPieces[0])
+					GenerateLocationExpression(limitsInfo, &elementParam.ParameterPieces[0])
 					expressionsToUseForEachArrayElement := collectAndRemoveLocationExpressions(&elementParam.ParameterPieces[0])
 					elementParam.LocationExpressions = append(elementParam.LocationExpressions,
 						// Read process stack address to the stack
@@ -95,7 +95,7 @@ func GenerateLocationExpression(param *ditypes.Parameter) {
 							ditypes.PopLocationExpression(1, 2),
 							// Read string dynamically:
 							ditypes.DirectReadLocationExpression(&str),
-							ditypes.DereferenceLargeToOutputLocationExpression(uint(ditypes.StringMaxSize)),
+							ditypes.DereferenceLargeToOutputLocationExpression(uint(limitsInfo.InstrumentationOptions.StringMaxSize)),
 						)
 					} else {
 						// Expect address of the string struct itself on the location expression stack
@@ -107,7 +107,7 @@ func GenerateLocationExpression(param *ditypes.Parameter) {
 							ditypes.DereferenceToOutputLocationExpression(2),
 							// Read from actual char pointer:
 							ditypes.DereferenceLocationExpression(8),
-							ditypes.DereferenceLargeToOutputLocationExpression(uint(ditypes.StringMaxSize)),
+							ditypes.DereferenceLargeToOutputLocationExpression(uint(limitsInfo.InstrumentationOptions.StringMaxSize)),
 						)
 					}
 					continue
@@ -122,7 +122,7 @@ func GenerateLocationExpression(param *ditypes.Parameter) {
 
 					// Generate and collect the location expressions for collecting an individual
 					// element of this slice
-					GenerateLocationExpression(&ptr.ParameterPieces[0])
+					GenerateLocationExpression(limitsInfo, &ptr.ParameterPieces[0])
 					expressionsToUseForEachSliceElement := collectAndRemoveLocationExpressions(&ptr.ParameterPieces[0])
 
 					labelName := randomLabel()
@@ -174,7 +174,7 @@ func GenerateLocationExpression(param *ditypes.Parameter) {
 						continue
 					}
 					//FIXME: Do we need to limit lengths of arrays??
-					GenerateLocationExpression(&elementParam.ParameterPieces[0])
+					GenerateLocationExpression(limitsInfo, &elementParam.ParameterPieces[0])
 					expressionsToUseForEachArrayElement := collectAndRemoveLocationExpressions(&elementParam.ParameterPieces[0])
 					for i := 0; i < len(elementParam.ParameterPieces); i++ {
 						elementParam.LocationExpressions = append(elementParam.LocationExpressions,
