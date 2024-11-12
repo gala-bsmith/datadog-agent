@@ -59,7 +59,7 @@ type osImpl interface {
 	DiscoverServices() (*discoveredServices, error)
 }
 
-var newOSImpl func(ignoreCfg map[string]bool, containerProvider proccontainers.ContainerProvider) (osImpl, error)
+var newOSImpl func(ignoreCfg map[string]bool) (osImpl, error)
 
 type config struct {
 	IgnoreProcesses []string `yaml:"ignore_processes"`
@@ -91,24 +91,17 @@ func Factory() optional.Option[func() check.Check] {
 		return optional.NewNoneOption[func() check.Check]()
 	}
 
-	sharedContainerProvider, err := proccontainers.GetSharedContainerProvider()
-
-	if err != nil {
-		return optional.NewNoneOption[func() check.Check]()
-	}
-
 	return optional.NewOption(func() check.Check {
-		return newCheck(sharedContainerProvider)
+		return newCheck()
 	})
 }
 
 // TODO: add metastore param
-func newCheck(containerProvider proccontainers.ContainerProvider) *Check {
+func newCheck() *Check {
 	return &Check{
 		CheckBase:             corechecks.NewCheckBase(CheckName),
 		cfg:                   &config{},
 		sentRepeatedEventPIDs: make(map[int]bool),
-		containerProvider:     containerProvider,
 	}
 }
 
@@ -135,7 +128,7 @@ func (c *Check) Configure(senderManager sender.SenderManager, _ uint64, instance
 	}
 	c.sender = newTelemetrySender(s)
 
-	c.os, err = newOSImpl(ignoreCfg, c.containerProvider)
+	c.os, err = newOSImpl(ignoreCfg)
 	if err != nil {
 		return err
 	}
