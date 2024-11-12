@@ -49,6 +49,8 @@ func ParseEvent(record []byte, ratelimiters *ratelimiter.MultiProbeRateLimiter) 
 		return nil
 	}
 
+	// We have probe ID here, use it to get instrumentation info from the specific probe
+
 	event.PID = baseEvent.Pid
 	event.UID = baseEvent.Uid
 	event.StackPCs = baseEvent.Program_counters[:]
@@ -73,7 +75,6 @@ func readParams(values []byte) []*ditypes.Param {
 			break
 		}
 		paramTypeDefinition := parseTypeDefinition(values[i:])
-		pretty.Log(paramTypeDefinition)
 		if paramTypeDefinition == nil {
 			break
 		}
@@ -149,7 +150,7 @@ func parseParamValue(definition *ditypes.Param, buffer []byte) (*ditypes.Param, 
 			bufferIndex += 2
 			paramDefinition.Size = size
 			paramDefinition.ValueStr = string(buffer[bufferIndex : bufferIndex+int(size)])
-			bufferIndex += int(ditypes.StringMaxSize)
+			bufferIndex += int(ditypes.StringMaxSize) //FIXME
 			valueStack.push(paramDefinition)
 		} else if !isTypeWithHeader(paramDefinition.Kind) {
 			if bufferIndex+int(paramDefinition.Size) >= len(buffer) {

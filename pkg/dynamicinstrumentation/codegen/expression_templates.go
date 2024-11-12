@@ -89,7 +89,7 @@ bpf_map_pop_elem(&param_stack, &addressHolder_{{.InstructionID}});
 
 for (i = 0; i < {{.Arg2}}; i++) {
     chunk_size = (i == {{.Arg2}} - 1 && {{.Arg1}} % 8 != 0) ? ({{.Arg1}} % 8) : 8;
-    bpf_probe_read(&temp_storage[i], {{.Arg1}}, (void*)(addressHolder_{{.InstructionID}} + (i * 8)));
+    bpf_probe_read(&temp_storage[i], chunk_size, (void*)(addressHolder_{{.InstructionID}} + (i * 8)));
 }
 
 // Mask the last chunk if {{.Arg1}} is not a multiple of 8
@@ -103,35 +103,15 @@ for (int i = 0; i < {{.Arg2}}; i++) {
 }
 
 // zero out shared array
-bpf_probe_read(temp_storage, {{.Arg1}}*{{.Arg2}}, zero_string);
+bpf_probe_read(temp_storage, {{.Arg1}}, zero_string);
 `
 
 var dereferenceLargeToOutputTemplateText = `
 // Arg1 = size in bytes of value we're reading from the 8 byte address at the top of the stack
-// Arg2 = number of chunks (should be ({{.Arg1}} + 7) / 8)
-bpf_printk("Dereferencing");
-
 __u64 addressHolder_{{.InstructionID}} = 0;
 bpf_map_pop_elem(&param_stack, &addressHolder_{{.InstructionID}});
-
-for (i = 0; i < {{.Arg2}}; i++) {
-    chunk_size = (i == {{.Arg2}} - 1 && {{.Arg1}} % 8 != 0) ? ({{.Arg1}} % 8) : 8;
-    bpf_probe_read(&temp_storage[i], {{.Arg1}}, (void*)(addressHolder_{{.InstructionID}} + (i * 8)));
-}
-
-// Mask the last chunk if {{.Arg1}} is not a multiple of 8
-if ({{.Arg1}} % 8 != 0) {
-    __u64 mask = (1ULL << (8 * ({{.Arg1}} % 8))) - 1;
-    temp_storage[{{.Arg2}} - 1] &= mask;
-}
-
-for (int i = 0; i < {{.Arg2}}; i++) {
-    bpf_probe_read(&event->output[outputOffset], 8, &temp_storage[i]);
-    outputOffset += 8;
-}
-
-// zero out shared array
-bpf_probe_read(temp_storage, {{.Arg1}}*{{.Arg2}}, zero_string);
+bpf_probe_read(&event->output[outputOffset], {{.Arg1}}, (void*)(addressHolder_{{.InstructionID}}));
+outputOffset += {{.Arg1}};
 `
 
 var applyOffsetTemplateText = `

@@ -178,7 +178,7 @@ func (cm *RCConfigManager) readConfigs(r *ringbuf.Reader, procInfo *ditypes.Proc
 			continue
 		}
 		if len(configEventParams) != 3 {
-			log.Errorf("error parsing configuration for PID %d: not enough arguments", procInfo.PID)
+			log.Errorf("error parsing configuration for PID: %d: not enough arguments", procInfo.PID)
 			continue
 		}
 
@@ -291,8 +291,8 @@ func newConfigProbe() *ditypes.Probe {
 		FuncName: "gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer.passProbeConfiguration",
 		InstrumentationInfo: &ditypes.InstrumentationInfo{
 			InstrumentationOptions: &ditypes.InstrumentationOptions{
-				ArgumentsMaxSize:  10000,
-				StringMaxSize:     3000,
+				ArgumentsMaxSize:  100000,
+				StringMaxSize:     30000,
 				MaxFieldCount:     int(ditypes.MaxFieldCount),
 				MaxReferenceDepth: 10,
 				CaptureParameters: true,

@@ -19,16 +19,16 @@ struct {
 } zeroval SEC(".maps");
 
 struct {
-	__uint(type, BPF_MAP_TYPE_STACK);
-	__uint(max_entries, 2048);
-	__type(value, __u64);
+    __uint(type, BPF_MAP_TYPE_STACK);
+    __uint(max_entries, 2048);
+    __type(value, __u64);
 } param_stack SEC(".maps");
 
 struct {
-	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
-	__uint(max_entries, 1);
-	__type(key, __u32);
-	__type(value, __u64[MAX_SLICE_SIZE]);
+    __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+    __uint(max_entries, 1);
+    __type(key, __u32);
+    __type(value, __u64[4000]);
 } temp_storage_array SEC(".maps");
 
 #endif
