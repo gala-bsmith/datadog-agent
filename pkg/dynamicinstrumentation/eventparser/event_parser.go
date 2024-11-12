@@ -23,64 +23,57 @@ import (
 	"github.com/kr/pretty"
 )
 
-// MaxBufferSize is the maximum size of the output buffer from bpf which is read by this package
-const MaxBufferSize = 10000
-
 var (
 	byteOrder = binary.LittleEndian
 )
 
 // ParseEvent takes the raw buffer from bpf and parses it into an event. It also potentially
 // applies a rate limit
-func ParseEvent(record []byte, ratelimiters *ratelimiter.MultiProbeRateLimiter) *ditypes.DIEvent {
+func ParseEvent(procs ditypes.DIProcs, record []byte, ratelimiters *ratelimiter.MultiProbeRateLimiter) (*ditypes.DIEvent, error) {
 	event := ditypes.DIEvent{}
 
 	if len(record) < ditypes.SizeofBaseEvent {
-		log.Tracef("malformed event record (length %d)", len(record))
-		return nil
+		return nil, fmt.Errorf("malformed event record (length %d)", len(record))
 	}
 	baseEvent := *(*ditypes.BaseEvent)(unsafe.Pointer(&record[0]))
 	event.ProbeID = unix.ByteSliceToString(baseEvent.Probe_id[:])
 
 	allowed, droppedEvents, successfulEvents := ratelimiters.AllowOneEvent(event.ProbeID)
 	if !allowed {
-		log.Tracef("event dropped by rate limit. Probe %s\t(%d dropped events out of %d)\n",
+		return nil, log.Errorf("event dropped by rate limit. Probe %s\t(%d dropped events out of %d)\n",
 			event.ProbeID, droppedEvents, droppedEvents+successfulEvents)
-		return nil
 	}
-
-	// We have probe ID here, use it to get instrumentation info from the specific probe
 
 	event.PID = baseEvent.Pid
 	event.UID = baseEvent.Uid
 	event.StackPCs = baseEvent.Program_counters[:]
-	event.Argdata = readParams(record[ditypes.SizeofBaseEvent:])
-	pretty.Log("Event:", event.Argdata)
 
-	return &event
-}
-
-// ParseParams extracts just the parsed parameters from the full event record
-func ParseParams(record []byte) ([]*ditypes.Param, error) {
-	if len(record) < 392 {
-		return nil, fmt.Errorf("malformed event record (length %d)", len(record))
+	probe := procs.GetProbe(event.PID, event.ProbeID)
+	if probe == nil {
+		return nil, fmt.Errorf("received event unassociated with probe. Probe ID: %s PID: %d", event.ProbeID, event.PID)
 	}
-	return readParams(record[392:]), nil
+
+	pretty.Log("Probe for params:", probe)
+	event.Argdata = readParamsForProbe(probe, record[ditypes.SizeofBaseEvent:])
+
+	return &event, nil
 }
 
-func readParams(values []byte) []*ditypes.Param {
+func readParamsForProbe(probe *ditypes.Probe, values []byte) []*ditypes.Param {
 	outputParams := []*ditypes.Param{}
-	for i := 0; i < MaxBufferSize; {
+	for i := 0; i < probe.InstrumentationInfo.InstrumentationOptions.ArgumentsMaxSize; {
 		if i+3 >= len(values) {
+			fmt.Println("Exceeded buffer")
 			break
 		}
 		paramTypeDefinition := parseTypeDefinition(values[i:])
 		if paramTypeDefinition == nil {
+			fmt.Println("Nil definition")
 			break
 		}
 		sizeOfTypeDefinition := countBufferUsedByTypeDefinition(paramTypeDefinition)
 		i += sizeOfTypeDefinition
-		val, numBytesRead := parseParamValue(paramTypeDefinition, values[i:])
+		val, numBytesRead := parseParamValueForProbe(probe, paramTypeDefinition, values[i:])
 		if val == nil {
 			return outputParams
 		}
@@ -91,13 +84,13 @@ func readParams(values []byte) []*ditypes.Param {
 	return outputParams
 }
 
-// parseParamValue takes the representation of the param type's definition and the
+// parseParamValueForProbe takes the representation of the param type's definition and the
 // actual values in the buffer and populates the definition with the value parsed
 // from the byte buffer. It returns the resulting parameter and an indication of
 // how many bytes were read from the buffer
-func parseParamValue(definition *ditypes.Param, buffer []byte) (*ditypes.Param, int) {
+func parseParamValueForProbe(probe *ditypes.Probe, definition *ditypes.Param, buffer []byte) (*ditypes.Param, int) {
 	var bufferIndex int = 0
-
+	fmt.Println(buffer)
 	// Start by creating a stack with each layer of the definition
 	// which will correspond with the layers of the values read from buffer.
 	// This is done using a temporary stack to reverse the order.
@@ -147,10 +140,12 @@ func parseParamValue(definition *ditypes.Param, buffer []byte) (*ditypes.Param, 
 				log.Error(err)
 				break
 			}
+			fmt.Println("Reading string of size ", size)
 			bufferIndex += 2
 			paramDefinition.Size = size
 			paramDefinition.ValueStr = string(buffer[bufferIndex : bufferIndex+int(size)])
-			bufferIndex += int(ditypes.StringMaxSize) //FIXME
+			fmt.Println("Value string: ", paramDefinition.ValueStr)
+			bufferIndex += int(probe.InstrumentationInfo.InstrumentationOptions.StringMaxSize)
 			valueStack.push(paramDefinition)
 		} else if !isTypeWithHeader(paramDefinition.Kind) {
 			if bufferIndex+int(paramDefinition.Size) >= len(buffer) {
