@@ -11,6 +11,7 @@ import (
 	"expvar"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -816,21 +817,33 @@ func (s *server) parseServiceCheckMessage(parser *parser, message []byte, origin
 	return serviceCheck, nil
 }
 
+// getBuckets converts the buckets from the configuration into slice of float64. The default from the configuration are
+// slice of strings
 func getBuckets(cfg model.Reader, logger log.Component, option string) []float64 {
-	if !cfg.IsSet(option) {
-		return nil
-	}
-
-	buckets, err := cfg.GetFloat64SliceE(option)
-	if err != nil {
-		logger.Errorf("%s, falling back to default values", err)
-		return nil
-	}
+	buckets, _ := getBucketsError(cfg, logger, option)
 	if len(buckets) == 0 {
 		logger.Debugf("'%s' is empty, falling back to default values", option)
 		return nil
 	}
 	return buckets
+}
+
+func getBucketsError(cfg model.Reader, logger log.Component, option string) ([]float64, error) {
+	if !cfg.IsSet(option) {
+		return nil, fmt.Errorf("unknown setting %s", option)
+	}
+
+	list := cfg.GetStringSlice(option)
+	buckets := []float64{}
+	for _, item := range list {
+		nb, err := strconv.ParseFloat(item, 64)
+		if err != nil {
+			return nil, logger.Errorf("value '%v' from '%v' is not a float64, falling back to default values", item, option)
+		}
+		buckets = append(buckets, nb)
+	}
+
+	return buckets, nil
 }
 
 func getDogstatsdMappingProfiles(cfg model.Reader) ([]mapper.MappingProfileConfig, error) {

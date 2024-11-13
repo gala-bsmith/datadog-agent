@@ -1326,3 +1326,42 @@ func TestDogstatsdMappingProfilesEnv(t *testing.T) {
 	mappings, _ := getDogstatsdMappingProfiles(cfg)
 	assert.Equal(t, expected, mappings)
 }
+
+func TestGetBucket(t *testing.T) {
+	logger := logmock.New(t)
+	config := configmock.NewFromYAML(t, `---
+float_list:
+  - 1.1
+  - "2.2"
+  - 3.3
+`)
+
+	list, err := getBucketsError(config, logger, ("float_list"))
+	assert.NoError(t, err)
+	assert.Equal(t, []float64{1.1, 2.2, 3.3}, list)
+}
+
+func TestGetBucketError(t *testing.T) {
+	logger := logmock.New(t)
+	config := configmock.NewFromYAML(t, `---
+float_list:
+  - a
+  - 2.2
+  - 3.3
+`)
+
+	list, err := getBucketsError(config, logger, ("float_list"))
+	assert.Error(t, err)
+	assert.Equal(t, "value 'a' from 'float_list' is not a float64, falling back to default values", err.Error())
+	assert.Nil(t, list)
+}
+
+func TestGetBucketString(t *testing.T) {
+	logger := logmock.New(t)
+	config := configmock.New(t)
+	config.Set("float_list", "1.1 2.2 3.3", model.SourceEnvVar)
+
+	list, err := getBucketsError(config, logger, ("float_list"))
+	assert.NoError(t, err)
+	assert.Equal(t, []float64{1.1, 2.2, 3.3}, list)
+}
