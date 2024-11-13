@@ -100,7 +100,6 @@ const (
 	OpDereferenceDynamicToOutput
 	OpApplyOffset
 	OpPop
-	OpPopDynamic
 	OpCopy
 	OpLabel
 	OpSetGlobalLimit
@@ -135,8 +134,6 @@ func (op LocationExpressionOpcode) String() string {
 		return "ApplyOffset"
 	case OpPop:
 		return "Pop"
-	case OpPopDynamic:
-		return "PopDynamic"
 	case OpCopy:
 		return "Copy"
 	default:
@@ -243,11 +240,6 @@ func ApplyOffsetLocationExpression(offset uint) LocationExpression {
 // Arg2 = size of each element
 func PopLocationExpression(numElements, elementSize uint) LocationExpression {
 	return LocationExpression{Opcode: OpPop, Arg1: numElements, Arg2: elementSize}
-}
-
-// Arg1 = size of each element
-func PopDynamicLocationExpression(elementSize uint) LocationExpression {
-	return LocationExpression{Opcode: OpPopDynamic, Arg1: elementSize}
 }
 
 // No args, just set label

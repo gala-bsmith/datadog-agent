@@ -176,9 +176,6 @@ func resolveLocationExpressionTemplate(locationExpression ditypes.LocationExpres
 	if locationExpression.Opcode == ditypes.OpPop {
 		return template.New("pop_location_expression").Parse(popTemplateText)
 	}
-	if locationExpression.Opcode == ditypes.OpPopDynamic {
-		return template.New("pop_dynamic_location_expression").Parse(popDynamicTemplateText)
-	}
 	if locationExpression.Opcode == ditypes.OpCopy {
 		return template.New("copy_location_expression").Parse(copyTemplateText)
 	}

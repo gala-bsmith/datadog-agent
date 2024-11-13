@@ -75,17 +75,20 @@ int {{.GetBPFFuncName}}(struct pt_regs *ctx)
     int chunk_size = 0;
     int outputOffset = 0;
 
-    struct expression_context context = {
-        .ctx = ctx,
-        .output_offset = &outputOffset,
-        .event = event
-    };
-	
     __u64 *temp_storage = bpf_map_lookup_elem(&temp_storage_array, &key) ;
     if (!temp_storage) {
         bpf_ringbuf_discard(event, 0);
         return 0;
     }
+
+    struct expression_context context = {
+        .ctx = ctx,
+        .output_offset = &outputOffset,
+        .event = event,
+        .limit = &collectionLimit,
+        .temp_storage = temp_storage,
+        .zero_string = zero_string
+    };
 
     {{ .InstrumentationInfo.BPFParametersSourceCode }}
 

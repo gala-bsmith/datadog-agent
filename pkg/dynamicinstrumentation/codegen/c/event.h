@@ -12,6 +12,9 @@ struct expression_context {
     int *output_offset;
     struct pt_regs *ctx;
     struct event *event;
+    __u16 *limit;
+    __u64 *temp_storage;
+    char *zero_string;
 };
 
 #endif

@@ -46,7 +46,6 @@ bpf_probe_read(&event->output[outputOffset], sizeof(param_type), &param_type);
 
 outputOffset += 1;
 
-// We put a single instance of the
 {{.SliceTypeHeaderText}}
 `
 

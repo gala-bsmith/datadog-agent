@@ -39,160 +39,57 @@ pop(context, {{.Arg1}}, {{.Arg2}});
 
 var dereferenceTemplateText = `
 // Arg1 = size in bytes of value we're reading from the 8 byte address at the top of the stack
-bpf_printk("Dereferencing");
-
-__u64 addressHolder_{{.InstructionID}} = 0;
-bpf_map_pop_elem(&param_stack, &addressHolder_{{.InstructionID}});
-
-// Read {{.Arg1}} bytes from the address that was popped from the stack
-
-__u64 valueHolder_{{.InstructionID}} = 0;
-bpf_probe_read(&valueHolder_{{.InstructionID}}, {{.Arg1}}, (void*)addressHolder_{{.InstructionID}});
-bpf_printk("\tRead %d bytes from %x for value %d", {{.Arg1}}, (void*)addressHolder_{{.InstructionID}}, valueHolder_{{.InstructionID}});
-
-__u64 mask_{{.InstructionID}} = ({{.Arg1}} == 8) ? ~0ULL : (1ULL << (8 * {{.Arg1}})) - 1;
-
-__u64 encodedValueHolder_{{.InstructionID}} = valueHolder_{{.InstructionID}} & mask_{{.InstructionID}};
-bpf_printk("\tEncoded value %d", encodedValueHolder_{{.InstructionID}});
-
-bpf_map_push_elem(&param_stack, &encodedValueHolder_{{.InstructionID}}, 0);
+dereference(context, {{.Arg1}});
 `
 
 var dereferenceToOutputTemplateText = `
 // Arg1 = size in bytes of value we're reading from the 8 byte address at the top of the stack
-bpf_printk("Dereferencing");
-
-__u64 addressHolder_{{.InstructionID}} = 0;
-bpf_map_pop_elem(&param_stack, &addressHolder_{{.InstructionID}});
-
-// Read {{.Arg1}} bytes from the address that was popped from the stack
-__u64 valueHolder_{{.InstructionID}} = 0;
-bpf_probe_read(&valueHolder_{{.InstructionID}}, {{.Arg1}}, (void*)addressHolder_{{.InstructionID}});
-bpf_printk("\tRead %d bytes from %x for value %d", {{.Arg1}}, (void*)addressHolder_{{.InstructionID}}, valueHolder_{{.InstructionID}});
-
-__u64 mask_{{.InstructionID}} = ({{.Arg1}} == 8) ? ~0ULL : (1ULL << (8 * {{.Arg1}})) - 1;
-
-__u64 encodedValueHolder_{{.InstructionID}} = valueHolder_{{.InstructionID}} & mask_{{.InstructionID}};
-bpf_printk("\tEncoded value %d", encodedValueHolder_{{.InstructionID}});
-
-bpf_probe_read(&event->output[outputOffset], {{.Arg1}}, &encodedValueHolder_{{.InstructionID}});
-outputOffset += {{.Arg1}};
+dereference_to_output(context, {{.Arg1}});
 `
 
 var dereferenceLargeTemplateText = `
 // Arg1 = size in bytes of value we're reading from the 8 byte address at the top of the stack
 // Arg2 = number of chunks (should be ({{.Arg1}} + 7) / 8)
-bpf_printk("Dereferencing");
-
-__u64 addressHolder_{{.InstructionID}} = 0;
-bpf_map_pop_elem(&param_stack, &addressHolder_{{.InstructionID}});
-
-for (i = 0; i < {{.Arg2}}; i++) {
-    chunk_size = (i == {{.Arg2}} - 1 && {{.Arg1}} % 8 != 0) ? ({{.Arg1}} % 8) : 8;
-    bpf_probe_read(&temp_storage[i], chunk_size, (void*)(addressHolder_{{.InstructionID}} + (i * 8)));
-}
-
-// Mask the last chunk if {{.Arg1}} is not a multiple of 8
-if ({{.Arg1}} % 8 != 0) {
-    __u64 mask = (1ULL << (8 * ({{.Arg1}} % 8))) - 1;
-    temp_storage[{{.Arg2}} - 1] &= mask;
-}
-
-for (int i = 0; i < {{.Arg2}}; i++) {
-    bpf_map_push_elem(&param_stack, &temp_storage[i], 0);
-}
-
-// zero out shared array
-bpf_probe_read(temp_storage, {{.Arg1}}, zero_string);
+dereference_large(context, {{.Arg1}}, {{.Arg2}});
 `
 
 var dereferenceLargeToOutputTemplateText = `
 // Arg1 = size in bytes of value we're reading from the 8 byte address at the top of the stack
-__u64 addressHolder_{{.InstructionID}} = 0;
-bpf_map_pop_elem(&param_stack, &addressHolder_{{.InstructionID}});
-bpf_probe_read(&event->output[outputOffset], {{.Arg1}}, (void*)(addressHolder_{{.InstructionID}}));
-outputOffset += {{.Arg1}};
+dereference_large_to_output(context, {{.Arg1}});
 `
 
 var applyOffsetTemplateText = `
 // Arg1 = uint value (offset) we're adding to the 8-byte address on top of the stack
-bpf_printk("Applying offset");
-
-__u64 addressHolder_{{.InstructionID}} = 0;
-bpf_map_pop_elem(&param_stack, &addressHolder_{{.InstructionID}});
-addressHolder_{{.InstructionID}} += {{.Arg1}};
-bpf_map_push_elem(&param_stack, &addressHolder_{{.InstructionID}}, 0);
-`
-
-var popDynamicTemplateText = `
+apply_offset(context, {{.Arg1}});
 `
 
 var dereferenceDynamicTemplateText = `
 // Arg1 = maximum limit on bytes read
 // Arg2 = number of chunks (should be (max + 7)/8)
 // Arg3 = size of each element
-
-__u64 lengthToRead_{{.InstructionID}} = 0;
-bpf_map_pop_elem(&param_stack, &lengthToRead_{{.InstructionID}});
-
-__u64 addressHolder_{{.InstructionID}} = 0;
-bpf_map_pop_elem(&param_stack, &addressHolder_{{.InstructionID}});
-
-for (i = 0; i < {{.Arg2}}; i++) {
-    chunk_size = (i == {{.Arg2}} - 1 && {{.Arg1}} % 8 != 0) ? ({{.Arg1}} % 8) : 8;
-    bpf_probe_read(&temp_storage[i], chunk_size, (void*)(addressHolder_{{.InstructionID}} + (i * 8)));
-}
-
-for (int i = 0; i < {{.Arg2}}; i++) {
-    bpf_probe_read(&event->output[outputOffset], 8, &temp_storage[i]);
-    outputOffset += 8;
-}
+dereference_dynamic(context, {{.Arg1}}, {{.Arg2}}, {{.Arg3}});
 `
 
 var dereferenceDynamicToOutputTemplateText = `
 // Arg1 = maximum limit on bytes read
-
-__u64 lengthToRead_{{.InstructionID}} = 0;
-bpf_map_pop_elem(&param_stack, &lengthToRead_{{.InstructionID}});
-
-__u64 addressHolder_{{.InstructionID}} = 0;
-bpf_map_pop_elem(&param_stack, &addressHolder_{{.InstructionID}});
-
-__u16 collection_size_{{.InstructionID}};
-collection_size_{{.InstructionID}} = lengthToRead_{{.InstructionID}};
-if (collection_size_{{.InstructionID}} > {{.Arg1}}) {
-    collection_size_{{.InstructionID}} = {{.Arg1}};
-}
-
-bpf_probe_read(&event->output[outputOffset], collection_size_{{.InstructionID}}, (void*)addressHolder_{{.InstructionID}});
-outputOffset += collection_size_{{.InstructionID}};
+dereference_dynamic_to_output(context, {{.Arg1}});
 `
 
 var copyTemplateText = `
-__u64 holder_{{.InstructionID}};
-bpf_map_peek_elem(&param_stack, &holder_{{.InstructionID}});
-bpf_map_push_elem(&param_stack, &holder_{{.InstructionID}}, 0);
-`
-
-var labelTemplateText = `
-{{.Label}}:
+copy(context);
 `
 
 var setGlobalLimitText = `
 // Arg1 = Maximum limit
-
-// Read the 2 byte length from top of the stack, then set collectionLimit to the minimum of the two
-__u64 length_{{.InstructionID}};
-bpf_map_pop_elem(&param_stack, &length_{{.InstructionID}});
-
-collectionLimit = (__u16)length_{{.InstructionID}};
-if (collectionLimit > {{.Arg1}}) {
-    collectionLimit = {{.Arg1}};
-}
+set_global_limit(context, {{.Arg1}});
 `
 
 var jumpIfGreaterThanLimitText = `
 if ({{.Arg1}} == collectionLimit) {
     goto {{.Label}};
 }
+`
+
+var labelTemplateText = `
+{{.Label}}:
 `
