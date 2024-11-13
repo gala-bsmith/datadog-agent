@@ -42,6 +42,7 @@ const (
 	kubeNamespaceDogstatsStandaloneWorkload = "workload-dogstatsd-standalone"
 	kubeNamespaceTracegenWorkload           = "workload-tracegen"
 	kubeDeploymentDogstatsdUDPOrigin        = "dogstatsd-udp-origin-detection"
+	kubeDeploymentDogstatsdUDPExternalData  = "dogstatsd-udp-external-data-only"
 	kubeDeploymentDogstatsdUDS              = "dogstatsd-uds"
 	kubeDeploymentTracegenTCPWorkload       = "tracegen-tcp"
 	kubeDeploymentTracegenUDSWorkload       = "tracegen-uds"
@@ -802,6 +803,8 @@ func (suite *k8sSuite) TestDogstatsdInAgent() {
 	suite.testDogstatsdContainerID(kubeNamespaceDogstatsWorkload, kubeDeploymentDogstatsdUDPOrigin)
 	// Test with UDP + DD_ENTITY_ID
 	suite.testDogstatsdPodUID(kubeNamespaceDogstatsWorkload)
+	// Test with UDP and only External Data
+	suite.testDogstatsdExternalData(kubeNamespaceDogstatsWorkload, kubeDeploymentDogstatsdUDPExternalData)
 }
 
 func (suite *k8sSuite) TestDogstatsdStandalone() {
@@ -833,6 +836,42 @@ func (suite *k8sSuite) testDogstatsdPodUID(kubeNamespace string) {
 				`^pod_name:dogstatsd-udp-[[:alnum:]]+-[[:alnum:]]+$`,
 				`^pod_phase:running$`,
 				`^series:`,
+			},
+		},
+	})
+}
+
+// testDogstatsdExternalData tests that the External Data origin resolution works for the dogstatsd.
+func (suite *k8sSuite) testDogstatsdExternalData(kubeNamespace, kubeDeployment string) {
+	suite.testMetric(&testMetricArgs{
+		Filter: testMetricFilterArgs{
+			Name: "custom.metric",
+			Tags: []string{
+				"^kube_deployment:" + regexp.QuoteMeta(kubeDeployment) + "$",
+				"^kube_namespace:" + regexp.QuoteMeta(kubeNamespace) + "$",
+			},
+		},
+		Expect: testMetricExpectArgs{
+			Tags: &[]string{
+				`^container_id:`,
+				`^container_name:dogstatsd$`,
+				`^display_container_name:dogstatsd`,
+				`^git.commit.sha:`, // org.opencontainers.image.revision docker image label
+				`^git.repository_url:https://github.com/DataDog/test-infra-definitions$`, // org.opencontainers.image.source   docker image label
+				`^image_id:ghcr.io/datadog/apps-dogstatsd@sha256:`,
+				`^image_name:ghcr.io/datadog/apps-dogstatsd$`,
+				`^image_tag:main$`,
+				`^kube_container_name:dogstatsd$`,
+				`^kube_deployment:` + regexp.QuoteMeta(kubeDeployment) + `$`,
+				"^kube_namespace:" + regexp.QuoteMeta(kubeNamespace) + "$",
+				`^kube_ownerref_kind:replicaset$`,
+				`^kube_ownerref_name:` + regexp.QuoteMeta(kubeDeployment) + `-[[:alnum:]]+$`,
+				`^kube_qos:Burstable$`,
+				`^kube_replica_set:` + regexp.QuoteMeta(kubeDeployment) + `-[[:alnum:]]+$`,
+				`^pod_name:` + regexp.QuoteMeta(kubeDeployment) + `-[[:alnum:]]+-[[:alnum:]]+$`,
+				`^pod_phase:running$`,
+				`^series:`,
+				`^short_image:apps-dogstatsd$`,
 			},
 		},
 	})
