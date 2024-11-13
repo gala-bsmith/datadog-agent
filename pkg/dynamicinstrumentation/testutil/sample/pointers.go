@@ -83,6 +83,10 @@ func test_struct_with_string_pointer(z spws) {}
 func test_string_pointer(z *string) {}
 
 //nolint:all
+//go:noinline
+func test_string_slice_pointer(a *[]string) {}
+
+//nolint:all
 func ExecutePointerFuncs() {
 	var u64F uint64 = 5
 	swp := structWithPointer{a: &u64F}
@@ -132,4 +136,7 @@ func ExecutePointerFuncs() {
 
 	aruint := [2]uint{1, 2}
 	test_array_pointer(&aruint)
+
+	stringSlice := []string{"aaa", "bbb", "ccc", "dddddd"}
+	test_string_slice_pointer(&stringSlice)
 }
