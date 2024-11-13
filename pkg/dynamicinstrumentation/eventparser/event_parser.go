@@ -20,7 +20,6 @@ import (
 	"github.com/DataDog/datadog-agent/pkg/dynamicinstrumentation/ditypes"
 	"github.com/DataDog/datadog-agent/pkg/dynamicinstrumentation/ratelimiter"
 	"github.com/DataDog/datadog-agent/pkg/util/log"
-	"github.com/kr/pretty"
 )
 
 var (
@@ -53,7 +52,6 @@ func ParseEvent(procs ditypes.DIProcs, record []byte, ratelimiters *ratelimiter.
 		return nil, fmt.Errorf("received event unassociated with probe. Probe ID: %s PID: %d", event.ProbeID, event.PID)
 	}
 
-	pretty.Log("Probe for params:", probe)
 	event.Argdata = readParamsForProbe(probe, record[ditypes.SizeofBaseEvent:])
 
 	return &event, nil
@@ -63,12 +61,10 @@ func readParamsForProbe(probe *ditypes.Probe, values []byte) []*ditypes.Param {
 	outputParams := []*ditypes.Param{}
 	for i := 0; i < probe.InstrumentationInfo.InstrumentationOptions.ArgumentsMaxSize; {
 		if i+3 >= len(values) {
-			fmt.Println("Exceeded buffer")
 			break
 		}
 		paramTypeDefinition := parseTypeDefinition(values[i:])
 		if paramTypeDefinition == nil {
-			fmt.Println("Nil definition")
 			break
 		}
 		sizeOfTypeDefinition := countBufferUsedByTypeDefinition(paramTypeDefinition)
@@ -90,7 +86,6 @@ func readParamsForProbe(probe *ditypes.Probe, values []byte) []*ditypes.Param {
 // how many bytes were read from the buffer
 func parseParamValueForProbe(probe *ditypes.Probe, definition *ditypes.Param, buffer []byte) (*ditypes.Param, int) {
 	var bufferIndex int = 0
-	fmt.Println(buffer)
 	// Start by creating a stack with each layer of the definition
 	// which will correspond with the layers of the values read from buffer.
 	// This is done using a temporary stack to reverse the order.
@@ -140,11 +135,9 @@ func parseParamValueForProbe(probe *ditypes.Probe, definition *ditypes.Param, bu
 				log.Error(err)
 				break
 			}
-			fmt.Println("Reading string of size ", size)
 			bufferIndex += 2
 			paramDefinition.Size = size
 			paramDefinition.ValueStr = string(buffer[bufferIndex : bufferIndex+int(size)])
-			fmt.Println("Value string: ", paramDefinition.ValueStr)
 			bufferIndex += int(probe.InstrumentationInfo.InstrumentationOptions.StringMaxSize)
 			valueStack.push(paramDefinition)
 		} else if !isTypeWithHeader(paramDefinition.Kind) {
