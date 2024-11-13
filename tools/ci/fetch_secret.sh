@@ -1,7 +1,7 @@
 #!/bin/bash
 
 retry_count=0
-max_retries=10
+max_retries=3
 parameter_name="$1"
 parameter_field="$2"
 
@@ -9,7 +9,12 @@ set +x
 
 while [[ $retry_count -lt $max_retries ]]; do
     if [ -n "$parameter_field" ]; then
-        result=$(vault kv get -field="${parameter_field}" kv/k8s/gitlab-runner/datadog-agent/"${parameter_name}" 2> errorFile)
+        vault_name="kv/k8s/gitlab-runner/datadog-agent"
+        if [[ "$(uname -s)" == "Darwin" ]]; then
+            vault_name="kv/aws/arn:aws:iam::486234852809:role/ci-datadog-agent"
+        fi
+        echo "Using vault $vault_name"
+        result=$(vault kv get -field="${parameter_field}" "${vault_name}"/"${parameter_name}" 2> errorFile)
     else
         result=$(aws ssm get-parameter --region us-east-1 --name "$parameter_name" --with-decryption --query "Parameter.Value" --output text 2> errorFile)
     fi
@@ -24,6 +29,8 @@ while [[ $retry_count -lt $max_retries ]]; do
         exit 42
     fi
     retry_count=$((retry_count+1))
+    echo "Failed to retrieve parameter: $error"
+    echo "Retrying[$retry_count/$max_retries] in $((2**retry_count)) seconds"
     sleep $((2**retry_count))
 done
 
