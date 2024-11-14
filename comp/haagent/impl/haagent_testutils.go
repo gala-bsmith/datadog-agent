@@ -27,5 +27,6 @@ func newTestComponent(t *testing.T, overrides map[string]interface{}) haagent.Co
 	require.NoError(t, err)
 
 	comp := provides.Comp
+	require.NotNil(t, comp)
 	return comp
 }
