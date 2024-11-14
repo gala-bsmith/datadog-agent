@@ -11,7 +11,7 @@ import (
 	"go.uber.org/fx"
 )
 
-func newTestComponent(t *testing.T, agentConfigs map[string]interface{}) haagent.Component {
+func newTestHaAgentComponent(t *testing.T, agentConfigs map[string]interface{}) haagent.Component {
 	logComponent := logmock.New(t)
 	agentConfigComponent := fxutil.Test[config.Component](t, fx.Options(
 		config.MockModule(),

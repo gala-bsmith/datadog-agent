@@ -29,8 +29,8 @@ func Test_Enabled(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			comp := newTestComponent(t, tt.configs)
-			assert.Equal(t, tt.expectedEnabled, comp.Enabled())
+			haAgent := newTestHaAgentComponent(t, tt.configs)
+			assert.Equal(t, tt.expectedEnabled, haAgent.Enabled())
 		})
 	}
 }
@@ -39,8 +39,8 @@ func Test_GetGroup(t *testing.T) {
 	agentConfigs := map[string]interface{}{
 		"ha_agent.group": "my-group-01",
 	}
-	comp := newTestComponent(t, agentConfigs)
-	assert.Equal(t, "my-group-01", comp.GetGroup())
+	haAgent := newTestHaAgentComponent(t, agentConfigs)
+	assert.Equal(t, "my-group-01", haAgent.GetGroup())
 }
 
 func Test_IsLeader_SetLeader(t *testing.T) {
@@ -48,11 +48,11 @@ func Test_IsLeader_SetLeader(t *testing.T) {
 		"hostname":                 "my-agent-hostname",
 		"ha_agent.expectedEnabled": true,
 	}
-	comp := newTestComponent(t, agentConfigs)
+	haAgent := newTestHaAgentComponent(t, agentConfigs)
 
-	comp.SetLeader("another-agent")
-	assert.False(t, comp.IsLeader())
+	haAgent.SetLeader("another-agent")
+	assert.False(t, haAgent.IsLeader())
 
-	comp.SetLeader("my-agent-hostname")
-	assert.True(t, comp.IsLeader())
+	haAgent.SetLeader("my-agent-hostname")
+	assert.True(t, haAgent.IsLeader())
 }
