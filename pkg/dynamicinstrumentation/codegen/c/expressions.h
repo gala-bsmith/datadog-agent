@@ -8,41 +8,61 @@
 
 static __always_inline int read_register(struct expression_context context, __u64 reg, __u32 element_size)
 {
+    long err;
     __u64 valueHolder = 0;
-    bpf_probe_read(&valueHolder,  element_size, &context.ctx->DWARF_REGISTER(reg));
+    err = bpf_probe_read(&valueHolder,  element_size, &context.ctx->DWARF_REGISTER(reg));
+    if (err != 0) {
+        bpf_printk("error when reading data: %d", err);
+    }
     bpf_map_push_elem(&param_stack, &valueHolder, 0);
     return 0;
 }
 
 static __always_inline int read_stack(struct expression_context context, size_t stack_offset, __u32 element_size)
 {
+    long err;
     __u64 valueHolder = 0;
-    bpf_probe_read(&valueHolder, element_size, &context.ctx->DWARF_STACK_REGISTER+stack_offset);
+    err = bpf_probe_read(&valueHolder, element_size, &context.ctx->DWARF_STACK_REGISTER+stack_offset);
+    if (err != 0) {
+        bpf_printk("error when reading data: %d", err);
+    }
     bpf_map_push_elem(&param_stack, &valueHolder, 0);
     return 0;
 }
 
 static __always_inline int read_register_value_to_output(struct expression_context context, __u64 reg, __u32 element_size)
 {
-    bpf_probe_read(&context.event->output[*(context.output_offset)], element_size, &context.ctx->DWARF_REGISTER(reg));
+    long err;
+    err = bpf_probe_read(&context.event->output[*(context.output_offset)], element_size, &context.ctx->DWARF_REGISTER(reg));
+    if (err != 0) {
+        bpf_printk("error when reading data: %d", err);
+    }
     *context.output_offset += element_size;
     return 0;
 }
 
 static __always_inline int read_stack_value_to_output(struct expression_context context, __u64 stack_offset, __u32 element_size)
 {
-    bpf_probe_read(&context.event->output[*(context.output_offset)], element_size, &context.ctx->DWARF_STACK_REGISTER+stack_offset);
+    long err;
+    err = bpf_probe_read(&context.event->output[*(context.output_offset)], element_size, &context.ctx->DWARF_STACK_REGISTER+stack_offset);
+    if (err != 0) {
+        bpf_printk("error when reading data: %d", err);
+    }
     *context.output_offset += element_size;
     return 0;
 }
 
 static __always_inline int pop(struct expression_context context, __u64 num_elements, __u32 element_size)
 {
+    long err;
     __u64 valueHolder;
     int i;
     for(i = 0; i < num_elements; i++) {
         bpf_map_pop_elem(&param_stack, &valueHolder);
-        bpf_probe_read(&context.event->output[*(context.output_offset)+i], element_size, &valueHolder);
+        err = bpf_probe_read(&context.event->output[*(context.output_offset)+i], element_size, &valueHolder);
+        if (err != 0) {
+            bpf_printk("error when reading data: %d", err);
+        }
         *context.output_offset += element_size;
     }
     return 0;
@@ -50,12 +70,15 @@ static __always_inline int pop(struct expression_context context, __u64 num_elem
 
 static __always_inline int dereference(struct expression_context context, __u32 element_size)
 {
+    long err;
     __u64 addressHolder = 0;
     bpf_map_pop_elem(&param_stack, &addressHolder);
 
     __u64 valueHolder = 0;
-    bpf_probe_read(&valueHolder, element_size, (void*)addressHolder);
-
+    err = bpf_probe_read(&valueHolder, element_size, (void*)addressHolder);
+    if (err != 0) {
+        bpf_printk("error when reading data: %d", err);
+    }
     __u64 mask = (element_size == 8) ? ~0ULL : (1ULL << (8 * element_size)) - 1;
     __u64 encodedValueHolder = valueHolder & mask;
 
@@ -65,22 +88,29 @@ static __always_inline int dereference(struct expression_context context, __u32 
 
 static __always_inline int dereference_to_output(struct expression_context context, __u32 element_size)
 {
+    long err;
     __u64 addressHolder = 0;
     bpf_map_pop_elem(&param_stack, &addressHolder);
 
     __u64 valueHolder = 0;
-    bpf_probe_read(&valueHolder, element_size, (void*)addressHolder);
-
+    err = bpf_probe_read(&valueHolder, element_size, (void*)addressHolder);
+    if (err != 0) {
+        bpf_printk("error when reading data: %d", err);
+    }
     __u64 mask = (element_size == 8) ? ~0ULL : (1ULL << (8 * element_size)) - 1;
     __u64 encodedValueHolder = valueHolder & mask;
 
-    bpf_probe_read(&context.event->output[*(context.output_offset)], element_size, &encodedValueHolder);
+    err = bpf_probe_read(&context.event->output[*(context.output_offset)], element_size, &encodedValueHolder);
+    if (err != 0) {
+        bpf_printk("error when reading data: %d", err);
+    }
     *context.output_offset += element_size;
     return 0;
 }
 
 static __always_inline int dereference_large(struct expression_context context, __u32 element_size, __u8 num_chunks)
 {
+    long err;
     __u64 addressHolder = 0;
     bpf_map_pop_elem(&param_stack, &addressHolder);
 
@@ -88,7 +118,10 @@ static __always_inline int dereference_large(struct expression_context context, 
     __u32 chunk_size;
     for (i = 0; i < num_chunks; i++) {
         chunk_size = (i == num_chunks - 1 && element_size % 8 != 0) ? (element_size % 8) : 8;
-        bpf_probe_read(&context.temp_storage[i], element_size, (void*)(addressHolder + (i * 8)));
+        err = bpf_probe_read(&context.temp_storage[i], element_size, (void*)(addressHolder + (i * 8)));
+        if (err != 0) {
+            bpf_printk("error when reading data: %d", err);
+        }
     }
 
     // Mask the last chunk if element_size is not a multiple of 8
@@ -102,15 +135,22 @@ static __always_inline int dereference_large(struct expression_context context, 
     }
 
     // zero out shared array
-    bpf_probe_read(context.temp_storage, element_size*num_chunks, context.zero_string);
+    err = bpf_probe_read(context.temp_storage, element_size*num_chunks, context.zero_string);
+    if (err != 0) {
+        bpf_printk("error when reading data: %d", err);
+    }
     return 0;
 }
 
 static __always_inline int dereference_large_to_output(struct expression_context context, __u32 element_size)
 {
+    long err;
     __u64 addressHolder = 0;
     bpf_map_pop_elem(&param_stack, &addressHolder);
-    bpf_probe_read(&context.event->output[*(context.output_offset)], element_size, (void*)(addressHolder));
+    err = bpf_probe_read(&context.event->output[*(context.output_offset)], element_size, (void*)(addressHolder));
+    if (err != 0) {
+        bpf_printk("error when reading data: %d", err);
+    }
     *context.output_offset += element_size;
     return 0;
 }
@@ -126,6 +166,7 @@ static __always_inline int apply_offset(struct expression_context context, size_
 
 static __always_inline int dereference_dynamic(struct expression_context context, __u32 bytes_limit, __u8 num_chunks, __u32 element_size)
 {
+    long err;
     __u64 lengthToRead = 0;
     bpf_map_pop_elem(&param_stack, &lengthToRead);
 
@@ -136,11 +177,17 @@ static __always_inline int dereference_dynamic(struct expression_context context
     __u32 chunk_size;
     for (i = 0; i < num_chunks; i++) {
         chunk_size = (i == num_chunks - 1 && bytes_limit % 8 != 0) ? (bytes_limit % 8) : 8;
-        bpf_probe_read(&context.temp_storage[i], chunk_size, (void*)(addressHolder + (i * 8)));
+        err = bpf_probe_read(&context.temp_storage[i], chunk_size, (void*)(addressHolder + (i * 8)));
+        if (err != 0) {
+            bpf_printk("error when reading data: %d", err);
+        }
     }
 
     for (i = 0; i < num_chunks; i++) {
-        bpf_probe_read(&context.event->output[*(context.output_offset)], 8, &context.temp_storage[i]);
+        err = bpf_probe_read(&context.event->output[*(context.output_offset)], 8, &context.temp_storage[i]);
+        if (err != 0) {
+            bpf_printk("error when reading data: %d", err);
+        }
         *context.output_offset += 8;
     }
     return 0;
@@ -148,6 +195,7 @@ static __always_inline int dereference_dynamic(struct expression_context context
 
 static __always_inline int dereference_dynamic_to_output(struct expression_context context, __u32 bytes_limit)
 {
+    long err;
     __u64 lengthToRead = 0;
     bpf_map_pop_elem(&param_stack, &lengthToRead);
 
@@ -160,7 +208,10 @@ static __always_inline int dereference_dynamic_to_output(struct expression_conte
         collection_size = bytes_limit;
     }
 
-    bpf_probe_read(&context.event->output[*(context.output_offset)], collection_size, (void*)addressHolder);
+    err = bpf_probe_read(&context.event->output[*(context.output_offset)], collection_size, (void*)addressHolder);
+    if (err != 0) {
+        bpf_printk("error when reading data: %d", err);
+    }
     *context.output_offset += collection_size;
     return 0;
 }
