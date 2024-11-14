@@ -19,6 +19,10 @@ type mock struct {
 	Logger log.Component
 }
 
+func (m *mock) Enabled() bool {
+	return true
+}
+
 func (m *mock) SetLeader(leaderAgent string) {
 }
 

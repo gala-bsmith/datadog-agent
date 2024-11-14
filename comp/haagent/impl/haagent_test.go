@@ -3,39 +3,23 @@ package haagentimpl
 import (
 	"testing"
 
-	"github.com/DataDog/datadog-agent/comp/core/config"
-	logmock "github.com/DataDog/datadog-agent/comp/core/log/mock"
-	"github.com/DataDog/datadog-agent/pkg/util/fxutil"
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/fx"
 )
 
 func TestServer(t *testing.T) {
-	logComponent := logmock.New(t)
 
 	overrides := map[string]interface{}{
 		"hostname":         "my-agent-hostname",
 		"ha_agent.enabled": true,
 	}
-	config := fxutil.Test[config.Component](t, fx.Options(
-		config.MockModule(),
-		fx.Replace(config.MockParams{Overrides: overrides}),
-	))
 
-	requires := Requires{
-		Logger:      logComponent,
-		AgentConfig: config,
-	}
+	comp := newTestComponent(t, overrides)
 
-	provides, err := NewComponent(requires)
+	assert.NotNil(t, comp)
 
-	assert.NoError(t, err)
+	comp.SetLeader("another-agent")
+	assert.False(t, comp.IsLeader())
 
-	assert.NotNil(t, provides.Comp)
-
-	provides.Comp.SetLeader("another-agent")
-	assert.False(t, provides.Comp.IsLeader())
-
-	provides.Comp.SetLeader("my-agent-hostname")
-	assert.True(t, provides.Comp.IsLeader())
+	comp.SetLeader("my-agent-hostname")
+	assert.True(t, comp.IsLeader())
 }

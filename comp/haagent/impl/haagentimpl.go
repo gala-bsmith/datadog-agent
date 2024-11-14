@@ -22,6 +22,10 @@ func newHaAgentImpl(log log.Component, haAgentConfigs *haAgentConfigs) *haAgentI
 	}
 }
 
+func (h *haAgentImpl) Enabled() bool {
+	return h.haAgentConfigs.enabled
+}
+
 func (h *haAgentImpl) IsLeader() bool {
 	return h.isLeader.Load()
 }
