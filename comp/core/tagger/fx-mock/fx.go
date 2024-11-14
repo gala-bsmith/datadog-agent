@@ -9,13 +9,8 @@
 package fx
 
 import (
-	"go.uber.org/fx"
-
-	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
 	fakeimpl "github.com/DataDog/datadog-agent/comp/core/tagger/impl-fake"
-	taggermock "github.com/DataDog/datadog-agent/comp/core/tagger/mock"
 	"github.com/DataDog/datadog-agent/pkg/util/fxutil"
-	"github.com/DataDog/datadog-agent/pkg/util/optional"
 )
 
 // team: container-platform
@@ -24,9 +19,5 @@ import (
 func MockModule() fxutil.Module {
 	return fxutil.Component(
 		fxutil.ProvideComponentConstructor(fakeimpl.NewComponent),
-		fx.Provide(func(mock taggermock.Mock) tagger.Component { return mock }),
-		fx.Provide(func(mock taggermock.Mock) optional.Option[tagger.Component] {
-			return optional.NewOption[tagger.Component](mock)
-		}),
 	)
 }
