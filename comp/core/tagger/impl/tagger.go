@@ -27,6 +27,7 @@ import (
 	log "github.com/DataDog/datadog-agent/comp/core/log/def"
 	taggercommon "github.com/DataDog/datadog-agent/comp/core/tagger/common"
 	tagger "github.com/DataDog/datadog-agent/comp/core/tagger/def"
+	fakeimpl "github.com/DataDog/datadog-agent/comp/core/tagger/impl-fake"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/telemetry"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/utils"
@@ -133,7 +134,10 @@ func NewTaggerClient(params tagger.Params, cfg config.Component, wmeta optional.
 	var err error
 	telemetryStore := telemetry.NewStore(telemetryComp)
 	if params.UseFakeTagger {
-		defaultTagger = newFakeTagger(cfg, telemetryStore)
+		defaultTagger = fakeimpl.NewComponent(fakeimpl.Requires{
+			Config:    cfg,
+			Telemetry: telemetryComp,
+		}).Comp
 	} else {
 		defaultTagger, err = newLocalTagger(cfg, wmeta, telemetryStore)
 	}

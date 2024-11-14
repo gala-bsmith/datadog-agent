@@ -3,7 +3,11 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-present Datadog, Inc.
 
-package taggerimpl
+//go:build test
+
+// Package fakeimpl provides a fake implementation for the tagger component
+// meant to be used in tests.
+package fakeimpl
 
 import (
 	"context"
@@ -16,10 +20,26 @@ import (
 	"github.com/DataDog/datadog-agent/comp/core/tagger/tagstore"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/telemetry"
 	"github.com/DataDog/datadog-agent/comp/core/tagger/types"
-
+	coretelemetry "github.com/DataDog/datadog-agent/comp/core/telemetry"
+	compdef "github.com/DataDog/datadog-agent/comp/def"
 	taggertypes "github.com/DataDog/datadog-agent/pkg/tagger/types"
 	"github.com/DataDog/datadog-agent/pkg/tagset"
 )
+
+// Requires defines the dependencies of the tagger component.
+type Requires struct {
+	compdef.In
+
+	Config    config.Component
+	Telemetry coretelemetry.Component
+}
+
+// Provides contains the fields provided by the tagger constructor.
+type Provides struct {
+	compdef.Out
+
+	Comp tagger.Component
+}
 
 // FakeTagger is a fake implementation of the tagger interface
 type FakeTagger struct {
@@ -29,11 +49,16 @@ type FakeTagger struct {
 	sync.RWMutex
 }
 
-func newFakeTagger(cfg config.Component, telemetryStore *telemetry.Store) *FakeTagger {
-	return &FakeTagger{
-		errors:         make(map[string]error),
-		store:          tagstore.NewTagStore(cfg, telemetryStore),
-		telemetryStore: telemetryStore,
+// NewComponent returns a fake tagger
+func NewComponent(req Requires) Provides {
+	telemetryStore := telemetry.NewStore(req.Telemetry)
+
+	return Provides{
+		Comp: &FakeTagger{
+			errors:         make(map[string]error),
+			store:          tagstore.NewTagStore(req.Config, telemetryStore),
+			telemetryStore: telemetryStore,
+		},
 	}
 }
 
