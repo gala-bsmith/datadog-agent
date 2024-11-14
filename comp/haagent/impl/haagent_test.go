@@ -14,6 +14,7 @@ func TestServer(t *testing.T) {
 	logComponent := logmock.New(t)
 
 	overrides := map[string]interface{}{
+		"hostname":         "my-agent-hostname",
 		"ha_agent.enabled": true,
 	}
 	config := fxutil.Test[config.Component](t, fx.Options(
@@ -32,6 +33,9 @@ func TestServer(t *testing.T) {
 
 	assert.NotNil(t, provides.Comp)
 
-	provides.Comp.SetLeader("abc")
+	provides.Comp.SetLeader("another-agent")
 	assert.False(t, provides.Comp.IsLeader())
+
+	provides.Comp.SetLeader("my-agent-hostname")
+	assert.True(t, provides.Comp.IsLeader())
 }

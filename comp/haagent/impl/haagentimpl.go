@@ -26,11 +26,12 @@ func (h *haAgentImpl) IsLeader() bool {
 	return h.isLeader.Load()
 }
 
-func (h *haAgentImpl) SetLeader(leaderAgent string) {
+// SetLeader will set current Agent as leader if the input leaderAgent matches the current Agent hostname
+func (h *haAgentImpl) SetLeader(leaderAgentHostname string) {
 	agentHostname, err := hostname.Get(context.TODO())
 	if err != nil {
 		h.log.Warnf("Error getting the hostname: %v", err)
 		return
 	}
-	h.isLeader.Store(agentHostname == leaderAgent)
+	h.isLeader.Store(agentHostname == leaderAgentHostname)
 }
