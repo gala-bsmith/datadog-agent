@@ -45,8 +45,7 @@ func Test_GetGroup(t *testing.T) {
 
 func Test_IsLeader_SetLeader(t *testing.T) {
 	agentConfigs := map[string]interface{}{
-		"hostname":                 "my-agent-hostname",
-		"ha_agent.expectedEnabled": true,
+		"hostname": "my-agent-hostname",
 	}
 	haAgent := newTestHaAgentComponent(t, agentConfigs)
 
