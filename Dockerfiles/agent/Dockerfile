@@ -207,6 +207,8 @@ RUN if [ -n "$PYTHON_VERSION" ]; then \
 # Enable FIPS if needed
 RUN if [ -x /opt/datadog-agent/embedded/bin/fipsinstall.sh ]; then \
   which openssl; \
+  /opt/datadog-agent/embedded/bin//openssl version; \
+  echo $PATH; \
   openssl version; \
   /opt/datadog-agent/embedded/bin/fipsinstall.sh; \
 fi
