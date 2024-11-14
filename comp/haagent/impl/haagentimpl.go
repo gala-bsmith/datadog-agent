@@ -26,6 +26,10 @@ func (h *haAgentImpl) Enabled() bool {
 	return h.haAgentConfigs.enabled
 }
 
+func (h *haAgentImpl) GetGroup() string {
+	return h.haAgentConfigs.group
+}
+
 func (h *haAgentImpl) IsLeader() bool {
 	return h.isLeader.Load()
 }

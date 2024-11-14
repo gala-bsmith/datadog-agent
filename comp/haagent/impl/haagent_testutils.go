@@ -11,11 +11,11 @@ import (
 	"go.uber.org/fx"
 )
 
-func newTestComponent(t *testing.T, overrides map[string]interface{}) haagent.Component {
+func newTestComponent(t *testing.T, agentConfigs map[string]interface{}) haagent.Component {
 	logComponent := logmock.New(t)
 	config := fxutil.Test[config.Component](t, fx.Options(
 		config.MockModule(),
-		fx.Replace(config.MockParams{Overrides: overrides}),
+		fx.Replace(config.MockParams{Overrides: agentConfigs}),
 	))
 
 	requires := Requires{

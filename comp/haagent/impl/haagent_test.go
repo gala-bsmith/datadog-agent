@@ -35,12 +35,20 @@ func Test_Enabled(t *testing.T) {
 	}
 }
 
+func Test_GetGroup(t *testing.T) {
+	agentConfigs := map[string]interface{}{
+		"ha_agent.group": "my-group-01",
+	}
+	comp := newTestComponent(t, agentConfigs)
+	assert.Equal(t, "my-group-01", comp.GetGroup())
+}
+
 func Test_IsLeader_SetLeader(t *testing.T) {
-	overrides := map[string]interface{}{
+	agentConfigs := map[string]interface{}{
 		"hostname":                 "my-agent-hostname",
 		"ha_agent.expectedEnabled": true,
 	}
-	comp := newTestComponent(t, overrides)
+	comp := newTestComponent(t, agentConfigs)
 
 	comp.SetLeader("another-agent")
 	assert.False(t, comp.IsLeader())

@@ -19,6 +19,10 @@ type mock struct {
 	Logger log.Component
 }
 
+func (m *mock) GetGroup() string {
+	return "mockGroup01"
+}
+
 func (m *mock) Enabled() bool {
 	return true
 }
