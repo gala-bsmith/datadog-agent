@@ -11,4 +11,5 @@ package haagent
 // Component is the component type.
 type Component interface {
 	IsLeader() bool
+	SetLeader(leaderAgent string)
 }

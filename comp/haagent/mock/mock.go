@@ -19,6 +19,9 @@ type mock struct {
 	Logger log.Component
 }
 
+func (m *mock) SetLeader(leaderAgent string) {
+}
+
 func (m *mock) IsLeader() bool { return false }
 
 // Provides that defines the output of mocked snmpscan component
