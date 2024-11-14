@@ -137,6 +137,12 @@ func parseParamValueForProbe(probe *ditypes.Probe, definition *ditypes.Param, bu
 			}
 			bufferIndex += 2
 			paramDefinition.Size = size
+			if len(buffer) <= bufferIndex+int(size) {
+				paramDefinition.ValueStr = ""
+				valueStack.push(paramDefinition)
+				bufferIndex += int(probe.InstrumentationInfo.InstrumentationOptions.StringMaxSize)
+				break
+			}
 			paramDefinition.ValueStr = string(buffer[bufferIndex : bufferIndex+int(size)])
 			bufferIndex += int(probe.InstrumentationInfo.InstrumentationOptions.StringMaxSize)
 			valueStack.push(paramDefinition)
