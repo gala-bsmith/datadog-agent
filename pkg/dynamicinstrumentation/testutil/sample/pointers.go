@@ -137,6 +137,6 @@ func ExecutePointerFuncs() {
 	aruint := [2]uint{1, 2}
 	test_array_pointer(&aruint)
 
-	stringSlice := []string{"aaa", "bbb", "ccc", "dddddd"}
+	stringSlice := []string{"aaa", "bbb", "ccc", "ddd"}
 	test_string_slice_pointer(&stringSlice)
 }
