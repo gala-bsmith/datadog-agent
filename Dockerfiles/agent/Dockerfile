@@ -206,6 +206,8 @@ RUN if [ -n "$PYTHON_VERSION" ]; then \
 
 # Enable FIPS if needed
 RUN if [ -x /opt/datadog-agent/embedded/bin/fipsinstall.sh ]; then \
+  which openssl; \
+  openssl version; \
   /opt/datadog-agent/embedded/bin/fipsinstall.sh; \
 fi
 # This is used by MSGO to enable FIPS mode so it won't affect the non-FIPS image
