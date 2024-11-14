@@ -14,7 +14,7 @@ type haAgentConfigs struct {
 	group   string
 }
 
-func newConfig(agentConfig config.Component) *haAgentConfigs {
+func newHaAgentConfigs(agentConfig config.Component) *haAgentConfigs {
 	return &haAgentConfigs{
 		enabled: agentConfig.GetBool("ha_agent.enabled"),
 		group:   agentConfig.GetString("ha_agent.group"),
