@@ -10,8 +10,16 @@ package haagent
 
 // Component is the component type.
 type Component interface {
+	// Enabled returns true if ha_agent.enabled is set to true
 	Enabled() bool
+
+	// GetGroup returns the value of ha_agent.group
 	GetGroup() string
+
+	// IsLeader returns true if the current Agent is leader
 	IsLeader() bool
+
+	// SetLeader takes the leader agent hostname as input, if it matches the current agent hostname,
+	// the isLeader state is set to true, otherwise false.
 	SetLeader(leaderAgentHostname string)
 }
