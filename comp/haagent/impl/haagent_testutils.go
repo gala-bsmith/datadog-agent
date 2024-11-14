@@ -13,14 +13,14 @@ import (
 
 func newTestComponent(t *testing.T, agentConfigs map[string]interface{}) haagent.Component {
 	logComponent := logmock.New(t)
-	agentConfig := fxutil.Test[config.Component](t, fx.Options(
+	agentConfigComponent := fxutil.Test[config.Component](t, fx.Options(
 		config.MockModule(),
 		fx.Replace(config.MockParams{Overrides: agentConfigs}),
 	))
 
 	requires := Requires{
 		Logger:      logComponent,
-		AgentConfig: agentConfig,
+		AgentConfig: agentConfigComponent,
 	}
 
 	provides, err := NewComponent(requires)
