@@ -13,5 +13,5 @@ type Component interface {
 	Enabled() bool
 	GetGroup() string
 	IsLeader() bool
-	SetLeader(leaderAgent string)
+	SetLeader(leaderAgentHostname string)
 }
